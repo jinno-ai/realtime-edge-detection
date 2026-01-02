@@ -223,7 +223,6 @@ Display: `**Confirm the Requirements are complete and correct to [C] continue:**
 
 #### EXECUTION RULES:
 
-- ALWAYS halt and wait for user input after presenting menu
 - ONLY proceed to next step when user selects 'C'
 - User can chat or ask questions - always respond and then end with display again of the menu option
 

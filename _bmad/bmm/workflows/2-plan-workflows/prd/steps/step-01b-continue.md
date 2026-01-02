@@ -138,7 +138,6 @@ Display: "Ready to continue with Step {nextStepNumber}?
 
 #### EXECUTION RULES:
 
-- ALWAYS halt and wait for user input after presenting menu
 - ONLY proceed to next step when user selects 'C'
 
 ## CRITICAL STEP COMPLETION NOTE

@@ -155,7 +155,6 @@ Display: **Select an Option:** [C] Continue to File Validation
 
 #### EXECUTION RULES:
 
-- ALWAYS halt and wait for user input after presenting menu
 - ONLY proceed with 'C' selection
 - If duplicates identified, insist on resolution first
 - User can clarify file locations or request additional searches

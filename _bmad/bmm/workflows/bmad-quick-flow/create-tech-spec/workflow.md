@@ -46,7 +46,6 @@ This uses **step-file architecture** for disciplined execution:
 
 1. **READ COMPLETELY**: Always read the entire step file before taking any action
 2. **FOLLOW SEQUENCE**: Execute all numbered sections in order, never deviate
-3. **WAIT FOR INPUT**: If a menu is presented, halt and wait for user selection
 4. **CHECK CONTINUATION**: Only proceed to next step when user selects [c] (Continue)
 5. **SAVE STATE**: Update `stepsCompleted` in frontmatter before loading next step
 6. **LOAD NEXT**: When directed, load and read entire next step file, then execute

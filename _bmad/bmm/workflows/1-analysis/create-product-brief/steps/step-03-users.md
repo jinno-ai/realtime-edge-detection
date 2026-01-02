@@ -171,7 +171,6 @@ Prepare the following structure for document append:
 
 #### EXECUTION RULES:
 
-- ALWAYS halt and wait for user input after presenting menu
 - ONLY proceed to next step when user selects 'C'
 - After other menu items execution, return to this menu with updated content
 - User can chat or ask questions - always respond and then end with display again of the menu options

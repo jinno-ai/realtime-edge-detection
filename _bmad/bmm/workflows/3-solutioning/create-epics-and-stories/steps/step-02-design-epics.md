@@ -201,7 +201,6 @@ Display: "**Select an Option:** [A] Advanced Elicitation [P] Party Mode [C] Cont
 
 #### EXECUTION RULES:
 
-- ALWAYS halt and wait for user input after presenting menu
 - ONLY proceed to next step when user selects 'C'
 - After other menu items execution completes, redisplay the menu
 - User can chat or ask questions - always respond when conversation ends, redisplay the menu options

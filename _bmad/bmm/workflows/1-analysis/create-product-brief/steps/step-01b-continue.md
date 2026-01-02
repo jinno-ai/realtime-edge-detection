@@ -135,7 +135,6 @@ Display: "Ready to continue with Step {nextStepNumber}: {nextStepTitle}?
 
 #### EXECUTION RULES:
 
-- ALWAYS halt and wait for user input after presenting menu
 - ONLY proceed to next step when user selects 'C'
 - User can chat or ask questions about current progress
 
