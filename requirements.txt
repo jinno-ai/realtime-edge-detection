@@ -1,0 +1,16 @@
+# Core
+opencv-python==4.8.1.78
+numpy==1.24.3
+pillow==10.1.0
+
+# YOLO
+ultralytics==8.0.230
+torch==2.1.0
+torchvision==0.16.0
+
+# TensorRT (optional, for optimization)
+# tensorrt==8.6.1
+
+# Utilities
+tqdm==4.66.1
+pyyaml==6.0.1
