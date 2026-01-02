@@ -5,12 +5,13 @@ Supports YAML files, environment variable overrides, and validation
 import os
 import re
 import logging
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, List
 from pathlib import Path
 
 import yaml
 
 from .errors import EdgeDetectionError, ErrorCode
+from .validators import ConfigValidator, ValidationError
 
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,17 @@ class ConfigManager:
         self.profile = profile
         self.default_config_path = default_config
         self._config: Dict[str, Any] = {}
-        self._validation_errors = []
+        self._validation_errors: List[str] = []
+        self.validator = ConfigValidator()
+
+        # Determine config directory
+        if config_path:
+            self.config_dir = Path(config_path).parent
+        elif default_config:
+            self.config_dir = Path(default_config).parent
+        else:
+            # Default to project config directory
+            self.config_dir = Path(__file__).parent.parent.parent / 'config'
 
     def load_config(self) -> Dict[str, Any]:
         """
@@ -90,18 +101,18 @@ class ConfigManager:
             Complete configuration dictionary
 
         Raises:
-            EdgeDetectionError: If configuration is invalid
+            EdgeDetectionError: If configuration is invalid or profile not found
         """
         # Start with built-in defaults
         self._config = self._deep_copy(self.DEFAULT_CONFIG)
 
-        # Load default config file if provided
+        # 1. Load default config file if provided
         if self.default_config_path:
             default_from_file = self._load_yaml_file(self.default_config_path)
             if default_from_file:
                 self._merge_configs(self._config, default_from_file)
 
-        # Load user configuration
+        # 2. Load user configuration
         if self.config_path and Path(self.config_path).exists():
             user_config = self._load_yaml_file(self.config_path)
             if user_config:
@@ -110,19 +121,22 @@ class ConfigManager:
             # Config file specified but doesn't exist - use defaults
             logger.warning(f"Config file not found: {self.config_path}, using defaults")
 
-        # Load profile if specified
+        # 3. Load profile if specified
         if self.profile:
             profile_config = self._load_profile(self.profile)
             if profile_config:
                 self._merge_configs(self._config, profile_config)
 
-        # Validate configuration
-        self._validate_required_params()
+        # 4. Validate configuration (before env var overrides)
+        self._validate_configuration()
 
-        # Apply environment variable overrides LAST (highest priority)
+        # 5. Apply environment variable overrides LAST (highest priority)
         env_overrides = self._load_env_overrides()
         if env_overrides:
             self._merge_configs(self._config, env_overrides)
+
+        # 6. Final validation after all merges
+        self._validate_required_params()
 
         return self._config
 
@@ -157,29 +171,13 @@ class ConfigManager:
         """
         self._validation_errors = []
 
-        # Validate confidence threshold range
-        conf_threshold = self.get('detection.confidence_threshold')
-        if conf_threshold is not None:
-            if not (0.0 <= conf_threshold <= 1.0):
-                self._validation_errors.append(
-                    "detection.confidence_threshold must be between 0.0 and 1.0, got {conf_threshold}"
-                )
+        # Use validator framework
+        errors = self.validator.validate(self._config)
 
-        # Validate IOU threshold range
-        iou_threshold = self.get('detection.iou_threshold')
-        if iou_threshold is not None:
-            if not (0.0 <= iou_threshold <= 1.0):
-                self._validation_errors.append(
-                    "detection.iou_threshold must be between 0.0 and 1.0, got {iou_threshold}"
-                )
-
-        # Validate batch size
-        batch_size = self.get('detection.batch_size')
-        if batch_size is not None:
-            if not isinstance(batch_size, int) or batch_size < 1:
-                self._validation_errors.append(
-                    f"detection.batch_size must be a positive integer, got {batch_size}"
-                )
+        # Convert ValidationError objects to strings
+        for error in errors:
+            error_msg = f"{error.parameter}: {error.error} (got {error.value})"
+            self._validation_errors.append(error_msg)
 
         # Check for missing required parameters
         for param in self.REQUIRED_PARAMS:
@@ -294,6 +292,24 @@ class ConfigManager:
 
         return overrides
 
+    def list_profiles(self) -> List[str]:
+        """
+        Discover and list available configuration profiles
+
+        Returns:
+            List of profile names (sorted alphabetically)
+        """
+        profiles = []
+
+        # Scan config directory for YAML files
+        if self.config_dir.exists():
+            for file in self.config_dir.glob("*.yaml"):
+                # Skip default.yaml (base config)
+                if file.name != "default.yaml":
+                    profiles.append(file.stem)
+
+        return sorted(profiles)
+
     def _load_profile(self, profile: str) -> Optional[Dict[str, Any]]:
         """
         Load profile configuration (dev/prod/testing)
@@ -303,16 +319,42 @@ class ConfigManager:
 
         Returns:
             Profile configuration or None
+
+        Raises:
+            EdgeDetectionError: If profile file doesn't exist
         """
-        # Try to find profile in config directory
-        config_dir = Path(__file__).parent.parent.parent / 'config'
-        profile_file = config_dir / f"{profile}.yaml"
+        profile_file = self.config_dir / f"{profile}.yaml"
 
-        if profile_file.exists():
-            return self._load_yaml_file(str(profile_file))
+        if not profile_file.exists():
+            # Get available profiles for error message
+            available = self.list_profiles()
 
-        logger.warning(f"Profile file not found: {profile_file}")
-        return None
+            raise EdgeDetectionError(
+                ErrorCode.INVALID_CONFIG,
+                f"Profile '{profile}' not found at {profile_file}",
+                hint=f"Available profiles: {', '.join(available) if available else 'None'}. "
+                     f"See: {self.config_dir}/prod.yaml for example"
+            )
+
+        return self._load_yaml_file(str(profile_file))
+
+    def _validate_configuration(self) -> None:
+        """
+        Validate configuration and raise exception if invalid
+
+        Raises:
+            EdgeDetectionError: If configuration is invalid
+        """
+        errors = self.validator.validate(self._config)
+
+        if errors:
+            # Raise first error with full details
+            error = errors[0]
+            raise EdgeDetectionError(
+                ErrorCode.INVALID_CONFIG,
+                f"Invalid {error.parameter}: {error.value} - {error.error}",
+                hint=error.hint
+            )
 
     def _merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> None:
         """

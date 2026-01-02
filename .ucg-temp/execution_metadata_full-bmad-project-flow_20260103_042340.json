@@ -1,0 +1,18 @@
+{
+  "instruction_file": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection/instructions/full-bmad-project-flow.md",
+  "executor_command": "claude --dangerously-skip-permissions -p -d",
+  "timestamp": "2026-01-03T04:23:40.961571",
+  "execution_time_seconds": 50.47420048713684,
+  "returncode": 0,
+  "stdout": "完璧です！必要なドキュメントを確認しました:\n\n✅ **PRDドキュメント**: `_bmad-output/planning-artifacts/02-PRD.md`\n✅ **Architectureドキュメント**: `_bmad-output/planning-artifacts/03-ARCHITECTURE.md`\n❌ **UX Design**: このプロジェクトはCLI/バックエンドツールキットのため、UIなし\n\n他に分析に含めたいドキュメントはありますか? 除外すべきドキュメントはありますか?\n\n確認をお願いします。\n",
+  "stderr": "",
+  "success": true,
+  "target_info": {
+    "type": "repository",
+    "path": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+    "source": "target_repository"
+  },
+  "temp_file": "instruction_full-bmad-project-flow_20260103_042250.md",
+  "working_directory": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+  "critical_save_errors": []
+}

@@ -1,6 +1,6 @@
 """
 Unit tests for ConfigManager
-Tests YAML loading, environment variable overrides, validation, and error handling
+Tests YAML loading, environment variable overrides, validation, and profile loading
 """
 import os
 import pytest
@@ -288,11 +288,13 @@ class TestConfigValidation:
 
         if ConfigManager:
             manager = ConfigManager(str(config_file))
-            config = manager.load_config()
 
-            # Validation should catch this
-            is_valid = manager.validate()
-            assert is_valid is False
+            # load_config should raise exception for invalid config
+            with pytest.raises(Exception) as exc_info:
+                manager.load_config()
+
+            error_msg = str(exc_info.value)
+            assert 'confidence_threshold' in error_msg
         else:
             pytest.fail("ConfigManager not implemented")
 
@@ -307,11 +309,13 @@ class TestConfigValidation:
 
         if ConfigManager:
             manager = ConfigManager(str(config_file))
-            config = manager.load_config()
 
-            # Validation should catch this
-            is_valid = manager.validate()
-            assert is_valid is False
+            # load_config should raise exception for invalid config
+            with pytest.raises(Exception) as exc_info:
+                manager.load_config()
+
+            error_msg = str(exc_info.value)
+            assert 'iou_threshold' in error_msg
         else:
             pytest.fail("ConfigManager not implemented")
 
@@ -346,13 +350,15 @@ class TestConfigValidation:
 
         if ConfigManager:
             manager = ConfigManager(str(config_file))
-            config = manager.load_config()
-            is_valid = manager.validate()
 
-            if not is_valid:
-                # Should provide error message with hints
-                # (Implementation dependent - check error is raised or logged)
-                pass
+            with pytest.raises(Exception) as exc_info:
+                manager.load_config()
+
+            # Check for hint in error
+            error = exc_info.value
+            if hasattr(error, 'hint'):
+                assert error.hint  # Hint should exist
+                assert '0.0' in error.hint or '1.0' in error.hint
         else:
             pytest.fail("ConfigManager not implemented")
 
@@ -394,6 +400,329 @@ class TestDotNotationAccess:
             # Test default value
             result = manager.get('model.nonexistent', 'default_value')
             assert result == 'default_value'
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+
+class TestProfileLoading:
+    """Test profile-based configuration loading"""
+
+    def test_load_profile_overrides_base(self, tmp_path):
+        """Test that profile settings override base settings"""
+        # Create default config
+        default_config = tmp_path / "default.yaml"
+        default_content = {
+            'model': {'type': 'yolo_v8', 'path': 'yolov8n.pt'},
+            'detection': {'confidence_threshold': 0.5, 'iou_threshold': 0.4}
+        }
+        with open(default_config, 'w') as f:
+            yaml.dump(default_content, f)
+
+        # Create profile config
+        profile_config = tmp_path / "dev.yaml"
+        profile_content = {
+            'detection': {'confidence_threshold': 0.3}  # Override
+        }
+        with open(profile_config, 'w') as f:
+            yaml.dump(profile_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(
+                default_config=str(default_config),
+                profile='dev'
+            )
+            manager.config_dir = tmp_path
+            config = manager.load_config()
+
+            # Profile should override base
+            assert config['detection']['confidence_threshold'] == 0.3
+
+            # Non-overridden values should remain
+            assert config['detection']['iou_threshold'] == 0.4
+            assert config['model']['type'] == 'yolo_v8'
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_load_profile_deep_merge(self, tmp_path):
+        """Test that profile deep merges with base config"""
+        default_config = tmp_path / "default.yaml"
+        default_content = {
+            'model': {'type': 'yolo_v8', 'path': 'yolov8n.pt', 'download': True},
+            'detection': {'confidence_threshold': 0.5}
+        }
+        with open(default_config, 'w') as f:
+            yaml.dump(default_content, f)
+
+        profile_config = tmp_path / "prod.yaml"
+        profile_content = {
+            'model': {'path': 'yolov8s.pt'}  # Only override path
+        }
+        with open(profile_config, 'w') as f:
+            yaml.dump(profile_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(
+                default_config=str(default_config),
+                profile='prod'
+            )
+            manager.config_dir = tmp_path
+            config = manager.load_config()
+
+            # Path should be overridden
+            assert config['model']['path'] == 'yolov8s.pt'
+
+            # Other model values should remain
+            assert config['model']['type'] == 'yolo_v8'
+            assert config['model']['download'] is True
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_missing_profile_raises_error(self, tmp_path):
+        """Test that missing profile file raises helpful error"""
+        default_config = tmp_path / "default.yaml"
+        default_content = {'model': {'type': 'yolo_v8', 'path': 'yolov8n.pt'}}
+        with open(default_config, 'w') as f:
+            yaml.dump(default_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(
+                default_config=str(default_config),
+                profile='nonexistent'
+            )
+            manager.config_dir = tmp_path
+
+            with pytest.raises(Exception) as exc_info:
+                manager.load_config()
+
+            error_msg = str(exc_info.value)
+            assert 'nonexistent' in error_msg
+            assert 'not found' in error_msg.lower()
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_list_profiles(self, tmp_path):
+        """Test listing available profiles"""
+        # Create multiple profile files
+        for profile in ['dev.yaml', 'prod.yaml', 'testing.yaml']:
+            profile_file = tmp_path / profile
+            with open(profile_file, 'w') as f:
+                yaml.dump({}, f)
+
+        if ConfigManager:
+            manager = ConfigManager()
+            manager.config_dir = tmp_path
+
+            profiles = manager.list_profiles()
+
+            assert 'dev' in profiles
+            assert 'prod' in profiles
+            assert 'testing' in profiles
+            assert len(profiles) == 3
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_list_profiles_excludes_default(self, tmp_path):
+        """Test that list_profiles excludes default.yaml"""
+        default_config = tmp_path / "default.yaml"
+        with open(default_config, 'w') as f:
+            yaml.dump({}, f)
+
+        dev_config = tmp_path / "dev.yaml"
+        with open(dev_config, 'w') as f:
+            yaml.dump({}, f)
+
+        if ConfigManager:
+            manager = ConfigManager()
+            manager.config_dir = tmp_path
+
+            profiles = manager.list_profiles()
+
+            # Should only include dev, not default
+            assert 'dev' in profiles
+            assert 'default' not in profiles
+            assert len(profiles) == 1
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_profile_error_message_includes_available_profiles(self, tmp_path):
+        """Test that profile error message lists available profiles"""
+        # Create some profiles
+        for profile in ['dev.yaml', 'prod.yaml']:
+            profile_file = tmp_path / profile
+            with open(profile_file, 'w') as f:
+                yaml.dump({}, f)
+
+        if ConfigManager:
+            manager = ConfigManager(profile='testing')
+            manager.config_dir = tmp_path
+
+            with pytest.raises(Exception) as exc_info:
+                manager.load_config()
+
+            error = exc_info.value
+            error_msg = str(exc_info.value)
+
+            # Check hint attribute if available
+            if hasattr(error, 'hint') and error.hint:
+                assert 'dev' in error.hint or 'prod' in error.hint
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+
+class TestConfigValidationIntegration:
+    """Test ConfigManager validation integration"""
+
+    def test_invalid_config_raises_validation_error(self, tmp_path):
+        """Test that invalid config raises EdgeDetectionError"""
+        config_file = tmp_path / "config.yaml"
+        config_content = {
+            'detection': {'confidence_threshold': 1.5}  # Invalid
+        }
+        with open(config_file, 'w') as f:
+            yaml.dump(config_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(str(config_file))
+
+            with pytest.raises(Exception) as exc_info:
+                manager.load_config()
+
+            error_msg = str(exc_info.value)
+            assert 'confidence_threshold' in error_msg
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_valid_config_passes_validation(self, tmp_path):
+        """Test that valid config passes validation"""
+        config_file = tmp_path / "config.yaml"
+        config_content = {
+            'model': {'type': 'yolo_v8', 'path': 'yolov8n.pt'},
+            'detection': {'confidence_threshold': 0.5, 'iou_threshold': 0.4},
+            'device': {'type': 'cpu'},
+            'logging': {'level': 'INFO', 'format': 'json'}
+        }
+        with open(config_file, 'w') as f:
+            yaml.dump(config_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(str(config_file))
+            config = manager.load_config()
+
+            assert config is not None
+            assert config['detection']['confidence_threshold'] == 0.5
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_validation_includes_helpful_hints(self, tmp_path):
+        """Test that validation errors include actionable hints"""
+        config_file = tmp_path / "config.yaml"
+        config_content = {
+            'detection': {'confidence_threshold': 1.5}
+        }
+        with open(config_file, 'w') as f:
+            yaml.dump(config_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(str(config_file))
+
+            with pytest.raises(Exception) as exc_info:
+                manager.load_config()
+
+            # Check for hint in error
+            error = exc_info.value
+            if hasattr(error, 'hint'):
+                assert error.hint  # Hint should exist
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_validate_method_returns_errors(self, tmp_path):
+        """Test that validate() method returns validation errors"""
+        # Create a valid config first to load
+        config_file = tmp_path / "config.yaml"
+        config_content = {
+            'model': {'type': 'yolo_v8', 'path': 'yolov8n.pt'},
+            'detection': {'confidence_threshold': 0.5}  # Valid to load
+        }
+        with open(config_file, 'w') as f:
+            yaml.dump(config_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(str(config_file))
+            config = manager.load_config()
+
+            # Now manually set invalid value to test validate() method
+            manager._config['detection']['confidence_threshold'] = 1.5
+
+            is_valid = manager.validate()
+            assert is_valid is False
+
+            errors = manager.get_validation_errors()
+            assert len(errors) > 0
+            assert 'confidence_threshold' in errors[0]
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+
+class TestProfileValidation:
+    """Test validation with profile-based configurations"""
+
+    def test_profile_with_invalid_config_raises_error(self, tmp_path):
+        """Test that profile with invalid config raises error"""
+        default_config = tmp_path / "default.yaml"
+        default_content = {
+            'model': {'type': 'yolo_v8', 'path': 'yolov8n.pt'},
+            'detection': {'confidence_threshold': 0.5}
+        }
+        with open(default_config, 'w') as f:
+            yaml.dump(default_content, f)
+
+        # Create profile with invalid config
+        profile_config = tmp_path / "badprofile.yaml"
+        profile_content = {
+            'detection': {'confidence_threshold': 2.0}  # Invalid
+        }
+        with open(profile_config, 'w') as f:
+            yaml.dump(profile_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(
+                default_config=str(default_config),
+                profile='badprofile'
+            )
+            manager.config_dir = tmp_path
+
+            with pytest.raises(Exception):
+                manager.load_config()
+        else:
+            pytest.fail("ConfigManager not implemented")
+
+    def test_profile_with_valid_config_passes(self, tmp_path):
+        """Test that profile with valid config passes validation"""
+        default_config = tmp_path / "default.yaml"
+        default_content = {
+            'model': {'type': 'yolo_v8', 'path': 'yolov8n.pt'},
+            'detection': {'confidence_threshold': 0.5}
+        }
+        with open(default_config, 'w') as f:
+            yaml.dump(default_content, f)
+
+        # Create profile with valid config
+        profile_config = tmp_path / "goodprofile.yaml"
+        profile_content = {
+            'detection': {'confidence_threshold': 0.7}  # Valid
+        }
+        with open(profile_config, 'w') as f:
+            yaml.dump(profile_content, f)
+
+        if ConfigManager:
+            manager = ConfigManager(
+                default_config=str(default_config),
+                profile='goodprofile'
+            )
+            manager.config_dir = tmp_path
+            config = manager.load_config()
+
+            assert config['detection']['confidence_threshold'] == 0.7
         else:
             pytest.fail("ConfigManager not implemented")
 

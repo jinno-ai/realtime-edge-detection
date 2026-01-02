@@ -26,23 +26,29 @@ def create_detector(args):
     Priority:
     1. Config file (if --config specified)
     2. Profile (if --profile specified)
-    3. Command-line args (overrides config file)
+    3. Default configuration
+    4. Command-line args (overrides all config)
     """
+    from src.core.config import ConfigManager
+
     # Load configuration
     if hasattr(args, 'config') and args.config:
-        config = ConfigManager(config_path=args.config)
+        config_manager = ConfigManager(config_path=args.config)
     elif hasattr(args, 'profile') and args.profile:
-        config = ConfigManager(profile=args.profile)
+        config_manager = ConfigManager(profile=args.profile)
     else:
-        config = ConfigManager()
+        config_manager = ConfigManager()
+
+    # Load and get the config dict
+    config = config_manager.load_config()
 
     # Apply command-line overrides
     if hasattr(args, 'model') and args.model:
-        config.config['model']['path'] = args.model
+        config['model']['path'] = args.model
     if hasattr(args, 'confidence') and args.confidence is not None:
-        config.config['detection']['confidence_threshold'] = args.confidence
+        config['detection']['confidence_threshold'] = args.confidence
     if hasattr(args, 'iou') and args.iou is not None:
-        config.config['detection']['iou_threshold'] = args.iou
+        config['detection']['iou_threshold'] = args.iou
 
     # Create detector with config
     return YOLODetector(config=config)
@@ -258,7 +264,7 @@ Examples:
     # Common arguments for all commands
     common_args = argparse.ArgumentParser(add_help=False)
     common_args.add_argument('--config', help='Path to configuration file (YAML)')
-    common_args.add_argument('--profile', choices=['dev', 'prod', 'testing'], help='Configuration profile')
+    common_args.add_argument('--profile', help='Configuration profile (dev/prod/testing)')
     common_args.add_argument('--model', help='Model path (overrides config)')
     common_args.add_argument('--confidence', type=float, help='Confidence threshold (overrides config)')
     common_args.add_argument('--iou', type=float, help='IOU threshold (overrides config)')

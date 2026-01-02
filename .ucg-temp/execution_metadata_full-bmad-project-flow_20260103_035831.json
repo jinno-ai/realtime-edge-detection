@@ -1,0 +1,18 @@
+{
+  "instruction_file": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection/instructions/full-bmad-project-flow.md",
+  "executor_command": "claude --dangerously-skip-permissions -p -d",
+  "timestamp": "2026-01-03T03:58:31.083256",
+  "execution_time_seconds": 81.72334909439087,
+  "returncode": 0,
+  "stdout": "Perfect! Found the documents:\n- `02-PRD.md` - PRD document\n- `03-ARCHITECTURE.md` - Architecture document  \n- No UX Design document (as expected for backend/CLI toolkit)\n\n既にepics.mdファイルが存在します。これは以前のワークフロー実行で作成されたものです。\n\n確認させてください：\n- PRD: `_bmad-output/planning-artifacts/02-PRD.md`\n- Architecture: `_bmad-output/planning-artifacts/03-ARCHITECTURE.md`\n- 既存のEpics: `_bmad-output/planning-artifacts/epics.md`\n\n分析に含める他のドキュメントはありますか？また、除外すべきドキュメントはありますか？\n",
+  "stderr": "",
+  "success": true,
+  "target_info": {
+    "type": "repository",
+    "path": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+    "source": "target_repository"
+  },
+  "temp_file": "instruction_full-bmad-project-flow_20260103_035709.md",
+  "working_directory": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+  "critical_save_errors": []
+}
