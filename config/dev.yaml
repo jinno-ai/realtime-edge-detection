@@ -2,25 +2,29 @@
 # Optimized for development and debugging
 
 model:
+  type: yolo_v8
   path: yolov8n.pt
-  auto_download: true
+  download: true
   cache_dir: ~/.cache/edge-detection/models
 
 device:
   type: cpu  # Use CPU for development (save GPU resources)
-  fallback_to_cpu: true
+  optimize: false  # Disable optimizations for faster debugging
+  quantization: null
 
 detection:
   confidence_threshold: 0.3  # Lower threshold for testing
   iou_threshold: 0.4
   max_detections: 100
+  batch_size: 1
 
-preprocessing:
-  target_size: [640, 640]
-  letterbox: true
-  normalize: true
+logging:
+  level: DEBUG  # Verbose logging for development
+  format: text  # Human-readable format
+  file: null  # Console output only
+  rotation: 10MB
 
-output:
-  format: json
-  save_detections: true
-  output_dir: output
+metrics:
+  enabled: false  # Disable metrics in development
+  export: prometheus
+  port: 9090

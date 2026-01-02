@@ -2,25 +2,29 @@
 # Optimized for production deployment
 
 model:
+  type: yolo_v8
   path: yolov8n.pt
-  auto_download: true
+  download: false  # Don't auto-download in production
   cache_dir: ~/.cache/edge-detection/models
 
 device:
   type: auto  # Auto-detect best available device
-  fallback_to_cpu: true
+  optimize: true  # Enable optimizations for performance
+  quantization: null
 
 detection:
-  confidence_threshold: 0.6  # Higher threshold for production
-  iou_threshold: 0.45
+  confidence_threshold: 0.6  # Higher threshold for fewer false positives
+  iou_threshold: 0.45  # Slightly higher IOU for precision
   max_detections: 100
+  batch_size: 1
 
-preprocessing:
-  target_size: [640, 640]
-  letterbox: true
-  normalize: true
+logging:
+  level: INFO  # Standard logging level
+  format: json  # Structured logging for log aggregation
+  file: null  # Null = stdout (configure based on your logging system)
+  rotation: 10MB
 
-output:
-  format: json
-  save_detections: true
-  output_dir: output
+metrics:
+  enabled: true  # Enable metrics for monitoring
+  export: prometheus
+  port: 9090

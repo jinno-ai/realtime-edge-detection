@@ -1,26 +1,30 @@
-# Edge Detection Configuration
-# This is the default configuration file
+# Edge Detection Configuration - Default
+# This is the default configuration file for the edge detection toolkit
 
 model:
-  path: yolov8n.pt
-  auto_download: true
-  cache_dir: ~/.cache/edge-detection/models
+  type: yolo_v8  # Model type: yolo_v8, yolov5, etc.
+  path: yolov8n.pt  # Model file path (relative or absolute)
+  download: true  # Auto-download model if not found
+  cache_dir: ~/.cache/edge-detection  # Directory for cached models
 
 device:
-  type: auto  # auto, cpu, cuda, cuda:0, mps, tpu, onnx
-  fallback_to_cpu: true
+  type: auto  # Device type: auto, cpu, cuda, cuda:0, mps, tpu, onnx
+  optimize: true  # Enable device-specific optimizations
+  quantization: null  # Quantization mode: null, int8, fp16
 
 detection:
-  confidence_threshold: 0.5
-  iou_threshold: 0.4
-  max_detections: 100
+  confidence_threshold: 0.5  # Minimum confidence for detections (0.0-1.0)
+  iou_threshold: 0.4  # IOU threshold for NMS (0.0-1.0)
+  max_detections: 100  # Maximum number of detections to return
+  batch_size: 1  # Batch size for inference
 
-preprocessing:
-  target_size: [640, 640]
-  letterbox: true
-  normalize: true
+logging:
+  level: INFO  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: json  # Log format: json, text
+  file: null  # Log file path (null = stdout only)
+  rotation: 10MB  # Log rotation size
 
-output:
-  format: json  # json, csv, coco
-  save_detections: true
-  output_dir: output
+metrics:
+  enabled: true  # Enable metrics collection
+  export: prometheus  # Export format: prometheus, json
+  port: 9090  # Metrics server port
