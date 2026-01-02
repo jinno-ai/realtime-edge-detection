@@ -1,0 +1,26 @@
+# Production Configuration
+# Optimized for production deployment
+
+model:
+  path: yolov8n.pt
+  auto_download: true
+  cache_dir: ~/.cache/edge-detection/models
+
+device:
+  type: auto  # Auto-detect best available device
+  fallback_to_cpu: true
+
+detection:
+  confidence_threshold: 0.6  # Higher threshold for production
+  iou_threshold: 0.45
+  max_detections: 100
+
+preprocessing:
+  target_size: [640, 640]
+  letterbox: true
+  normalize: true
+
+output:
+  format: json
+  save_detections: true
+  output_dir: output

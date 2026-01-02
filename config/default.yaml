@@ -1,0 +1,26 @@
+# Edge Detection Configuration
+# This is the default configuration file
+
+model:
+  path: yolov8n.pt
+  auto_download: true
+  cache_dir: ~/.cache/edge-detection/models
+
+device:
+  type: auto  # auto, cpu, cuda, cuda:0, mps, tpu, onnx
+  fallback_to_cpu: true
+
+detection:
+  confidence_threshold: 0.5
+  iou_threshold: 0.4
+  max_detections: 100
+
+preprocessing:
+  target_size: [640, 640]
+  letterbox: true
+  normalize: true
+
+output:
+  format: json  # json, csv, coco
+  save_detections: true
+  output_dir: output

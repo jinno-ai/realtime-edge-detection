@@ -16,16 +16,42 @@ import time
 
 from src.models.yolo_detector import YOLODetector
 from src.preprocessing.image_processor import ImageProcessor
+from src.config.config_manager import ConfigManager
+
+
+def create_detector(args):
+    """
+    Create YOLODetector with configuration.
+
+    Priority:
+    1. Config file (if --config specified)
+    2. Profile (if --profile specified)
+    3. Command-line args (overrides config file)
+    """
+    # Load configuration
+    if hasattr(args, 'config') and args.config:
+        config = ConfigManager(config_path=args.config)
+    elif hasattr(args, 'profile') and args.profile:
+        config = ConfigManager(profile=args.profile)
+    else:
+        config = ConfigManager()
+
+    # Apply command-line overrides
+    if hasattr(args, 'model') and args.model:
+        config.config['model']['path'] = args.model
+    if hasattr(args, 'confidence') and args.confidence is not None:
+        config.config['detection']['confidence_threshold'] = args.confidence
+    if hasattr(args, 'iou') and args.iou is not None:
+        config.config['detection']['iou_threshold'] = args.iou
+
+    # Create detector with config
+    return YOLODetector(config=config)
 
 
 def detect_command(args):
     """Detect objects in image"""
     print("🔧 Initializing detector...")
-    detector = YOLODetector(
-        model_path=args.model,
-        conf_threshold=args.confidence,
-        iou_threshold=args.iou
-    )
+    detector = create_detector(args)
 
     print("🧠 Loading model...")
     detector.load_model()
@@ -70,11 +96,7 @@ def detect_command(args):
 def webcam_command(args):
     """Run real-time webcam detection"""
     print("🔧 Initializing detector...")
-    detector = YOLODetector(
-        model_path=args.model,
-        conf_threshold=args.confidence,
-        iou_threshold=args.iou
-    )
+    detector = create_detector(args)
 
     print("🧠 Loading model...")
     detector.load_model()
@@ -144,11 +166,7 @@ def webcam_command(args):
 def video_command(args):
     """Process video file"""
     print("🔧 Initializing detector...")
-    detector = YOLODetector(
-        model_path=args.model,
-        conf_threshold=args.confidence,
-        iou_threshold=args.iou
-    )
+    detector = create_detector(args)
 
     print("🧠 Loading model...")
     detector.load_model()
@@ -160,11 +178,7 @@ def video_command(args):
 def benchmark_command(args):
     """Benchmark detection performance"""
     print("🔧 Initializing detector...")
-    detector = YOLODetector(
-        model_path=args.model,
-        conf_threshold=args.confidence,
-        iou_threshold=args.iou
-    )
+    detector = create_detector(args)
 
     print("🧠 Loading model...")
     detector.load_model()
@@ -241,34 +255,32 @@ Examples:
 
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
+    # Common arguments for all commands
+    common_args = argparse.ArgumentParser(add_help=False)
+    common_args.add_argument('--config', help='Path to configuration file (YAML)')
+    common_args.add_argument('--profile', choices=['dev', 'prod', 'testing'], help='Configuration profile')
+    common_args.add_argument('--model', help='Model path (overrides config)')
+    common_args.add_argument('--confidence', type=float, help='Confidence threshold (overrides config)')
+    common_args.add_argument('--iou', type=float, help='IOU threshold (overrides config)')
+
     # Detect command
-    detect_parser = subparsers.add_parser('detect', help='Detect objects in image')
+    detect_parser = subparsers.add_parser('detect', help='Detect objects in image', parents=[common_args])
     detect_parser.add_argument('image', help='Input image path')
-    detect_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
-    detect_parser.add_argument('--confidence', type=float, default=0.5, help='Confidence threshold')
-    detect_parser.add_argument('--iou', type=float, default=0.4, help='IOU threshold')
     detect_parser.add_argument('--output', help='Output image path')
     detect_parser.add_argument('--show', action='store_true', help='Display result')
 
     # Webcam command
-    webcam_parser = subparsers.add_parser('webcam', help='Real-time webcam detection')
+    webcam_parser = subparsers.add_parser('webcam', help='Real-time webcam detection', parents=[common_args])
     webcam_parser.add_argument('--camera', type=int, default=0, help='Camera index')
-    webcam_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
-    webcam_parser.add_argument('--confidence', type=float, default=0.5, help='Confidence threshold')
-    webcam_parser.add_argument('--iou', type=float, default=0.4, help='IOU threshold')
 
     # Video command
-    video_parser = subparsers.add_parser('video', help='Process video file')
+    video_parser = subparsers.add_parser('video', help='Process video file', parents=[common_args])
     video_parser.add_argument('input', help='Input video path')
     video_parser.add_argument('--output', default='output.mp4', help='Output video path')
-    video_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
-    video_parser.add_argument('--confidence', type=float, default=0.5, help='Confidence threshold')
-    video_parser.add_argument('--iou', type=float, default=0.4, help='IOU threshold')
 
     # Benchmark command
-    bench_parser = subparsers.add_parser('benchmark', help='Benchmark performance')
+    bench_parser = subparsers.add_parser('benchmark', help='Benchmark performance', parents=[common_args])
     bench_parser.add_argument('--iterations', type=int, default=100, help='Number of iterations')
-    bench_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
 
     # Preprocess command
     pre_parser = subparsers.add_parser('preprocess', help='Test image preprocessing')

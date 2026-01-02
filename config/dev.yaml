@@ -1,0 +1,26 @@
+# Development Configuration
+# Optimized for development and debugging
+
+model:
+  path: yolov8n.pt
+  auto_download: true
+  cache_dir: ~/.cache/edge-detection/models
+
+device:
+  type: cpu  # Use CPU for development (save GPU resources)
+  fallback_to_cpu: true
+
+detection:
+  confidence_threshold: 0.3  # Lower threshold for testing
+  iou_threshold: 0.4
+  max_detections: 100
+
+preprocessing:
+  target_size: [640, 640]
+  letterbox: true
+  normalize: true
+
+output:
+  format: json
+  save_detections: true
+  output_dir: output

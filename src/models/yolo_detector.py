@@ -6,17 +6,73 @@ Real-time object detection using YOLO v8.
 
 import cv2
 import numpy as np
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional, Union
 import time
+import warnings
+
+from ..config.config_manager import ConfigManager
 
 
 class YOLODetector:
     """YOLO v8 object detector for edge devices"""
-    
-    def __init__(self, model_path: str, conf_threshold: float = 0.5, iou_threshold: float = 0.4):
-        self.model_path = model_path
-        self.conf_threshold = conf_threshold
-        self.iou_threshold = iou_threshold
+
+    def __init__(
+        self,
+        model_path: Optional[str] = None,
+        conf_threshold: Optional[float] = None,
+        iou_threshold: Optional[float] = None,
+        config: Optional[Union[ConfigManager, str]] = None
+    ):
+        """
+        Initialize YOLO detector.
+
+        Args:
+            model_path: Path to model file (deprecated, use config)
+            conf_threshold: Confidence threshold (deprecated, use config)
+            iou_threshold: IOU threshold (deprecated, use config)
+            config: ConfigManager instance or path to config file
+
+        Examples:
+            # New usage with config
+            detector = YOLODetector(config='config.yaml')
+            detector = YOLODetector(config=ConfigManager(profile='prod'))
+
+            # Legacy usage (deprecated, shows warning)
+            detector = YOLODetector(model_path='yolov8n.pt', conf_threshold=0.5)
+        """
+        # Initialize configuration
+        if config is None and model_path is None:
+            # Use default config
+            self.config = ConfigManager()
+        elif isinstance(config, str):
+            # Config path provided
+            self.config = ConfigManager(config_path=config)
+        elif isinstance(config, ConfigManager):
+            # ConfigManager instance provided
+            self.config = config
+        else:
+            # Legacy mode - create default config and issue warning
+            self.config = ConfigManager()
+            if model_path is not None:
+                warnings.warn(
+                    "Initializing YOLODetector with model_path parameter is deprecated. "
+                    "Use ConfigManager instead. Example: YOLODetector(config='config.yaml')",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                # Override config with legacy parameters
+                self.config.config['model']['path'] = model_path
+            if conf_threshold is not None:
+                self.config.config['detection']['confidence_threshold'] = conf_threshold
+            if iou_threshold is not None:
+                self.config.config['detection']['iou_threshold'] = iou_threshold
+
+        # Load configuration values
+        self.model_path = self.config.get('model', 'path')
+        self.conf_threshold = self.config.get('detection', 'confidence_threshold')
+        self.iou_threshold = self.config.get('detection', 'iou_threshold')
+        self.max_detections = self.config.get('detection', 'max_detections')
+
         self.model = None
         self.class_names = []
     
@@ -31,13 +87,21 @@ class YOLODetector:
             raise
     
     def detect(self, image: np.ndarray) -> List[Dict[str, Any]]:
-        """Detect objects in image"""
+        """
+        Detect objects in image.
+
+        Args:
+            image: Input image (numpy array)
+
+        Returns:
+            List of detections, each containing bbox, confidence, class_id, class_name
+        """
         if self.model is None:
             raise RuntimeError("Model not loaded. Call load_model() first.")
-        
+
         # Run inference
         results = self.model(image, conf=self.conf_threshold, iou=self.iou_threshold)
-        
+
         # Parse results
         detections = []
         for r in results:
@@ -46,14 +110,18 @@ class YOLODetector:
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                 conf = box.conf[0].cpu().numpy()
                 cls = int(box.cls[0].cpu().numpy())
-                
+
                 detections.append({
                     'bbox': [float(x1), float(y1), float(x2), float(y2)],
                     'confidence': float(conf),
                     'class_id': cls,
                     'class_name': self.model.names[cls]
                 })
-        
+
+                # Limit to max_detections
+                if len(detections) >= self.max_detections:
+                    break
+
         return detections
     
     def detect_video(self, video_path: str, output_path: str = None) -> None:
