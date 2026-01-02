@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""
+CLI Tool for Real-time Edge Detection
+
+Usage:
+    python run.py detect image.jpg
+    python run.py webcam
+    python run.py video input.mp4
+    python run.py benchmark
+"""
+
+import argparse
+import sys
+import cv2
+import time
+
+from src.models.yolo_detector import YOLODetector
+from src.preprocessing.image_processor import ImageProcessor
+
+
+def detect_command(args):
+    """Detect objects in image"""
+    print("🔧 Initializing detector...")
+    detector = YOLODetector(
+        model_path=args.model,
+        conf_threshold=args.confidence,
+        iou_threshold=args.iou
+    )
+
+    print("🧠 Loading model...")
+    detector.load_model()
+
+    # Load image
+    print(f"📸 Loading image: {args.image}")
+    image = cv2.imread(args.image)
+
+    if image is None:
+        print(f"❌ Error: Could not load image")
+        sys.exit(1)
+
+    # Detect
+    print("🔍 Detecting objects...")
+    start_time = time.time()
+    detections = detector.detect(image)
+    inference_time = time.time() - start_time
+
+    # Results
+    print(f"\n✅ Found {len(detections)} objects in {inference_time*1000:.1f}ms")
+
+    if detections:
+        print("\n📊 Detections:")
+        for i, det in enumerate(detections, 1):
+            print(f"   {i}. {det['class_name']}: {det['confidence']:.3f}")
+
+    # Draw and save
+    if args.output:
+        result = detector.draw_detections(image, detections)
+        cv2.imwrite(args.output, result)
+        print(f"\n💾 Saved result to: {args.output}")
+
+    # Show if requested
+    if args.show:
+        result = detector.draw_detections(image, detections)
+        cv2.imshow("Detections", result)
+        print("\n Press any key to close...")
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+
+def webcam_command(args):
+    """Run real-time webcam detection"""
+    print("🔧 Initializing detector...")
+    detector = YOLODetector(
+        model_path=args.model,
+        conf_threshold=args.confidence,
+        iou_threshold=args.iou
+    )
+
+    print("🧠 Loading model...")
+    detector.load_model()
+
+    # Open webcam
+    print(f"📹 Opening webcam (index {args.camera})...")
+    cap = cv2.VideoCapture(args.camera)
+
+    if not cap.isOpened():
+        print("❌ Error: Could not open webcam")
+        sys.exit(1)
+
+    print("✅ Webcam opened!")
+    print("Press 'q' to quit\n")
+
+    frame_count = 0
+    total_time = 0
+
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Detect
+            start_time = time.time()
+            detections = detector.detect(frame)
+            inference_time = time.time() - start_time
+
+            # Draw
+            frame = detector.draw_detections(frame, detections)
+
+            # FPS
+            fps = 1 / inference_time if inference_time > 0 else 0
+            frame_count += 1
+            total_time += inference_time
+            avg_fps = frame_count / total_time if total_time > 0 else 0
+
+            # Add info
+            cv2.putText(
+                frame,
+                f"FPS: {fps:.1f} (Avg: {avg_fps:.1f}) | Objects: {len(detections)}",
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2
+            )
+
+            # Display
+            cv2.imshow("YOLO Detection", frame)
+
+            # Quit
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    except KeyboardInterrupt:
+        print("\n⚠️  Interrupted")
+
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+        print(f"\n📊 Processed {frame_count} frames")
+        print(f"   Average FPS: {avg_fps:.1f}")
+
+
+def video_command(args):
+    """Process video file"""
+    print("🔧 Initializing detector...")
+    detector = YOLODetector(
+        model_path=args.model,
+        conf_threshold=args.confidence,
+        iou_threshold=args.iou
+    )
+
+    print("🧠 Loading model...")
+    detector.load_model()
+
+    print(f"🎬 Processing video: {args.input}")
+    detector.detect_video(args.input, args.output)
+
+
+def benchmark_command(args):
+    """Benchmark detection performance"""
+    print("🔧 Initializing detector...")
+    detector = YOLODetector(
+        model_path=args.model,
+        conf_threshold=args.confidence,
+        iou_threshold=args.iou
+    )
+
+    print("🧠 Loading model...")
+    detector.load_model()
+
+    print(f"\n🏃 Running {args.iterations} iterations...")
+
+    # Create test image
+    import numpy as np
+    test_image = np.random.randint(0, 255, (640, 640, 3), dtype=np.uint8)
+
+    times = []
+    for i in range(args.iterations):
+        start = time.time()
+        detections = detector.detect(test_image)
+        elapsed = time.time() - start
+        times.append(elapsed)
+
+        if (i + 1) % 10 == 0:
+            print(f"   Progress: {i + 1}/{args.iterations}")
+
+    # Statistics
+    avg_time = sum(times) / len(times)
+    min_time = min(times)
+    max_time = max(times)
+    avg_fps = 1 / avg_time
+
+    print("\n" + "=" * 60)
+    print("📊 Benchmark Results")
+    print("=" * 60)
+    print(f"\n   Iterations: {args.iterations}")
+    print(f"   Avg Time: {avg_time*1000:.2f}ms")
+    print(f"   Min Time: {min_time*1000:.2f}ms")
+    print(f"   Max Time: {max_time*1000:.2f}ms")
+    print(f"   Avg FPS: {avg_fps:.2f}")
+
+
+def preprocess_command(args):
+    """Test image preprocessing"""
+    print("🔧 Testing image preprocessing...")
+
+    processor = ImageProcessor(target_size=(640, 640))
+
+    # Load image
+    image = cv2.imread(args.image)
+    if image is None:
+        print(f"❌ Error: Could not load image")
+        sys.exit(1)
+
+    print(f"📸 Original size: {image.shape}")
+
+    # Letterbox
+    padded, scale, padding = processor.letterbox(image)
+    print(f"✅ Letterbox: {padded.shape}, scale: {scale:.3f}, padding: {padding}")
+
+    # Preprocess
+    preprocessed = processor.preprocess(image)
+    print(f"✅ Preprocessed: {preprocessed.shape}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Real-time Edge Detection CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python run.py detect image.jpg
+  python run.py detect image.jpg --show --output result.jpg
+  python run.py webcam
+  python run.py webcam --model yolov8n.pt --confidence 0.6
+  python run.py video input.mp4 --output output.mp4
+  python run.py benchmark --iterations 100
+        """
+    )
+
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+
+    # Detect command
+    detect_parser = subparsers.add_parser('detect', help='Detect objects in image')
+    detect_parser.add_argument('image', help='Input image path')
+    detect_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
+    detect_parser.add_argument('--confidence', type=float, default=0.5, help='Confidence threshold')
+    detect_parser.add_argument('--iou', type=float, default=0.4, help='IOU threshold')
+    detect_parser.add_argument('--output', help='Output image path')
+    detect_parser.add_argument('--show', action='store_true', help='Display result')
+
+    # Webcam command
+    webcam_parser = subparsers.add_parser('webcam', help='Real-time webcam detection')
+    webcam_parser.add_argument('--camera', type=int, default=0, help='Camera index')
+    webcam_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
+    webcam_parser.add_argument('--confidence', type=float, default=0.5, help='Confidence threshold')
+    webcam_parser.add_argument('--iou', type=float, default=0.4, help='IOU threshold')
+
+    # Video command
+    video_parser = subparsers.add_parser('video', help='Process video file')
+    video_parser.add_argument('input', help='Input video path')
+    video_parser.add_argument('--output', default='output.mp4', help='Output video path')
+    video_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
+    video_parser.add_argument('--confidence', type=float, default=0.5, help='Confidence threshold')
+    video_parser.add_argument('--iou', type=float, default=0.4, help='IOU threshold')
+
+    # Benchmark command
+    bench_parser = subparsers.add_parser('benchmark', help='Benchmark performance')
+    bench_parser.add_argument('--iterations', type=int, default=100, help='Number of iterations')
+    bench_parser.add_argument('--model', default='yolov8n.pt', help='Model path')
+
+    # Preprocess command
+    pre_parser = subparsers.add_parser('preprocess', help='Test image preprocessing')
+    pre_parser.add_argument('image', help='Input image path')
+
+    args = parser.parse_args()
+
+    if args.command == 'detect':
+        detect_command(args)
+    elif args.command == 'webcam':
+        webcam_command(args)
+    elif args.command == 'video':
+        video_command(args)
+    elif args.command == 'benchmark':
+        benchmark_command(args)
+    elif args.command == 'preprocess':
+        preprocess_command(args)
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
