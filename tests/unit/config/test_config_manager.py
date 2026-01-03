@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 import yaml
 
-from src.config.config_manager import ConfigManager
+from src.core.config import ConfigManager
 
 
 @pytest.fixture(autouse=True)

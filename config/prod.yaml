@@ -1,30 +1,25 @@
-# Production Configuration
-# Optimized for production deployment
-
+# Production configuration
 model:
-  type: yolo_v8
-  path: yolov8n.pt
-  download: false  # Don't auto-download in production
+  path: yolov8s.pt  # Larger model for production
+  type: yolov8
   cache_dir: ~/.cache/edge-detection/models
 
 device:
-  type: auto  # Auto-detect best available device
-  optimize: true  # Enable optimizations for performance
-  quantization: null
+  type: cuda  # Use GPU in production
+  fallback: cpu
+  gpu_id: 0
 
 detection:
-  confidence_threshold: 0.6  # Higher threshold for fewer false positives
-  iou_threshold: 0.45  # Slightly higher IOU for precision
-  max_detections: 100
-  batch_size: 1
+  confidence_threshold: 0.5  # Higher threshold for production
+  iou_threshold: 0.5
+  max_detections: 300
 
-logging:
-  level: INFO  # Standard logging level
-  format: json  # Structured logging for log aggregation
-  file: null  # Null = stdout (configure based on your logging system)
-  rotation: 10MB
+preprocessing:
+  target_size: [640, 640]
+  letterbox: true
+  normalize: true
 
-metrics:
-  enabled: true  # Enable metrics for monitoring
-  export: prometheus
-  port: 9090
+output:
+  format: json
+  save_dir: output
+  show_results: false  # Don't show results in production

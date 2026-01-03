@@ -10,7 +10,7 @@ from typing import List, Tuple, Dict, Any, Optional, Union
 import time
 import warnings
 
-from ..config.config_manager import ConfigManager
+from ..core.config import ConfigManager
 
 
 class YOLODetector:
