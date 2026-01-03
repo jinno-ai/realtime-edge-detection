@@ -43,7 +43,7 @@ development_status:
   # Epic 1: Project Setup & Basic Detection
   epic-1: in-progress
   1-1-yaml-config-system: done
-  1-2-config-validation-and-profiles: ready-for-dev
+  1-2-config-validation-and-profiles: done
   1-3-model-download-and-cache: backlog
   1-4-device-detection-and-selection: backlog
   1-5-basic-detection-cli: backlog

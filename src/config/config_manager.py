@@ -67,35 +67,102 @@ class ConfigManager:
             'format': 'json',  # json, csv, coco
             'save_detections': True,
             'output_dir': 'output'
+        },
+        'logging': {
+            'level': 'INFO',
+            'format': 'text',
+            'file': None,
+            'rotation': '10MB'
+        },
+        'metrics': {
+            'enabled': True,
+            'export': 'prometheus',
+            'port': 9090
         }
     }
 
-    # Validation rules
+    # Validation rules (enhanced for Story 1.2)
     VALIDATION_RULES = {
+        # Model settings
+        'model.path': {
+            'type': str,
+            'required': True,
+            'error_msg': 'Model path must be specified'
+        },
+        'model.auto_download': {
+            'type': bool,
+            'error_msg': 'auto_download must be a boolean (true/false)'
+        },
+
+        # Device settings
+        'device.type': {
+            'type': str,
+            'allowed_values': ['auto', 'cpu', 'cuda', 'cuda:0', 'cuda:1', 'mps', 'tpu', 'onnx'],
+            'error_msg': 'Device type must be one of: auto, cpu, cuda, cuda:0, cuda:1, mps, tpu, onnx'
+        },
+
+        # Detection settings
         'detection.confidence_threshold': {
             'type': float,
             'min': 0.0,
-            'max': 1.0
+            'max': 1.0,
+            'error_msg': 'Confidence threshold must be between 0.0 and 1.0',
+            'resolution_hint': 'Confidence threshold represents probability (0-100%). Valid values are between 0.0 and 1.0. Example: confidence_threshold: 0.5 (50% confidence)'
         },
         'detection.iou_threshold': {
             'type': float,
             'min': 0.0,
-            'max': 1.0
+            'max': 1.0,
+            'error_msg': 'IOU threshold must be between 0.0 and 1.0',
+            'resolution_hint': 'IOU (Intersection over Union) threshold for Non-Maximum Suppression. Valid values are between 0.0 and 1.0. Example: iou_threshold: 0.4'
         },
         'detection.max_detections': {
             'type': int,
             'min': 1,
-            'max': 1000
+            'max': 1000,
+            'error_msg': 'Max detections must be between 1 and 1000'
         },
+
+        # Preprocessing
         'preprocessing.target_size': {
             'type': list,
             'min_length': 2,
-            'max_length': 2
+            'max_length': 2,
+            'element_type': int,
+            'error_msg': 'Target size must be [width, height] with integer values'
         },
-        'device.type': {
+        'preprocessing.letterbox': {
+            'type': bool,
+            'error_msg': 'letterbox must be a boolean (true/false)'
+        },
+        'preprocessing.normalize': {
+            'type': bool,
+            'error_msg': 'normalize must be a boolean (true/false)'
+        },
+
+        # Output
+        'output.format': {
             'type': str,
-            'allowed_values': ['auto', 'cpu', 'cuda', 'mps', 'tpu', 'onnx']
-        }
+            'allowed_values': ['json', 'csv', 'coco'],
+            'error_msg': 'Output format must be one of: json, csv, coco'
+        },
+        'output.save_detections': {
+            'type': bool,
+            'error_msg': 'save_detections must be a boolean (true/false)'
+        },
+
+        # Logging
+        'logging.level': {
+            'type': str,
+            'allowed_values': ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+            'error_msg': 'Logging level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL'
+        },
+
+        # Metrics
+        'metrics.enabled': {
+            'type': bool,
+            'error_msg': 'metrics.enabled must be a boolean (true/false)'
+        },
     }
 
     def __init__(self, config_path: Optional[str] = None, profile: Optional[str] = None):
@@ -127,7 +194,20 @@ class ConfigManager:
             if profile_config_path:
                 self._merge_yaml_file(profile_config_path)
             else:
-                print(f"⚠️  Profile '{self.profile}' not found. Using base configuration.")
+                available_profiles = self._list_available_profiles()
+                profile_list = "\n".join(f"  • {name} - {desc}" for name, desc in sorted(available_profiles.items()))
+                raise FileNotFoundError(
+                    f"❌ Profile Not Found\n\n"
+                    f"Profile '{self.profile}' does not exist.\n\n"
+                    f"Available profiles:\n"
+                    f"{profile_list}\n\n"
+                    f"Profile location: config/{self.profile}.yaml\n\n"
+                    f"To create a custom profile:\n"
+                    f"  1. Copy config/default.yaml\n"
+                    f"  2. Rename to config/{self.profile}.yaml\n"
+                    f"  3. Modify settings as needed\n\n"
+                    f"Example profile file location: config/prod.yaml"
+                )
 
         # Apply environment variable overrides
         self._apply_env_overrides()
@@ -181,6 +261,36 @@ class ConfigManager:
                 return path
 
         return None
+
+    def _list_available_profiles(self) -> dict:
+        """List all available profile configuration files with descriptions"""
+        config_dir = Path.cwd() / 'config'
+        profiles = {}
+
+        # Profile descriptions
+        profile_descriptions = {
+            'dev': 'Development environment with debug logging',
+            'prod': 'Production environment optimized for performance',
+            'testing': 'Testing environment with deterministic settings'
+        }
+
+        if config_dir.exists():
+            for profile_file in config_dir.glob('*.yaml'):
+                # Skip default.yaml as it's the base config
+                if profile_file.name != 'default.yaml':
+                    profile_name = profile_file.stem
+                    description = profile_descriptions.get(profile_name, 'Custom profile')
+                    profiles[profile_name] = description
+
+        # Also check user config directory
+        user_config_dir = Path.home() / '.config' / 'edge-detection'
+        if user_config_dir.exists():
+            for profile_file in user_config_dir.glob('*.yaml'):
+                profile_name = profile_file.stem
+                if profile_name not in profiles:
+                    profiles[profile_name] = 'Custom user profile'
+
+        return profiles
 
     def _merge_yaml_file(self, file_path: Path) -> None:
         """Merge YAML file into configuration"""
@@ -246,16 +356,24 @@ class ConfigManager:
         return value
 
     def _validate_config(self) -> None:
-        """Validate configuration values"""
+        """Validate configuration values with enhanced error messages"""
         errors = []
 
         for key_path, rules in self.VALIDATION_RULES.items():
-            section, key = key_path.split('.', 1)
+            parts = key_path.split('.')
+            if len(parts) < 2:
+                continue
+
+            section = parts[0]
+            key = '.'.join(parts[1:])
 
             if section not in self.config:
                 continue
 
             if key not in self.config[section]:
+                # Check if required
+                if rules.get('required', False):
+                    errors.append(f"{key_path}: {rules.get('error_msg', 'Required field is missing')}")
                 continue
 
             value = self.config[section][key]
@@ -264,22 +382,35 @@ class ConfigManager:
             if 'type' in rules:
                 expected_type = rules['type']
                 if not isinstance(value, expected_type):
-                    errors.append(
-                        f"{key_path}: Expected type {expected_type.__name__}, got {type(value).__name__}"
-                    )
+                    error_msg = rules.get('error_msg',
+                        f"Invalid type for {key_path}: expected {expected_type.__name__}, got {type(value).__name__}")
+                    errors.append(f"{key_path}: {error_msg}")
                     continue
 
-            # Range validation
+            # Range validation with enhanced messages
             if 'min' in rules and value < rules['min']:
-                errors.append(f"{key_path}: Value {value} is below minimum {rules['min']}")
+                error_msg = rules.get('error_msg',
+                    f"{key_path} must be >= {rules['min']}")
+                errors.append(f"{key_path}: {error_msg} (got: {value})")
+
+                # Add resolution hint if available
+                if 'resolution_hint' in rules:
+                    errors.append(f"  Hint: {rules['resolution_hint']}")
+
             if 'max' in rules and value > rules['max']:
-                errors.append(f"{key_path}: Value {value} is above maximum {rules['max']}")
+                error_msg = rules.get('error_msg',
+                    f"{key_path} must be <= {rules['max']}")
+                errors.append(f"{key_path}: {error_msg} (got: {value})")
+
+                # Add resolution hint if available
+                if 'resolution_hint' in rules:
+                    errors.append(f"  Hint: {rules['resolution_hint']}")
 
             # Allowed values validation
             if 'allowed_values' in rules and value not in rules['allowed_values']:
-                errors.append(
-                    f"{key_path}: Value '{value}' not in allowed values {rules['allowed_values']}"
-                )
+                error_msg = rules.get('error_msg',
+                    f"Invalid value for {key_path}: {value}. Allowed: {rules['allowed_values']}")
+                errors.append(f"{key_path}: {error_msg}")
 
             # List length validation
             if 'min_length' in rules and len(value) < rules['min_length']:
@@ -287,8 +418,15 @@ class ConfigManager:
             if 'max_length' in rules and len(value) > rules['max_length']:
                 errors.append(f"{key_path}: List length {len(value)} is above maximum {rules['max_length']}")
 
+            # List element type validation
+            if 'element_type' in rules and isinstance(value, list):
+                for i, elem in enumerate(value):
+                    if not isinstance(elem, rules['element_type']):
+                        errors.append(f"{key_path}: Element {i} has invalid type. Expected {rules['element_type'].__name__}")
+
         if errors:
-            error_message = "Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+            error_message = "❌ Configuration Validation Error\n\n" + "\n".join(f"  • {e}" for e in errors)
+            error_message += "\n\n[✕] Failed to validate configuration. Fix the errors above and try again."
             raise ValueError(error_message)
 
     def get(self, section: str, key: str, default: Any = None) -> Any:
@@ -329,6 +467,23 @@ class ConfigManager:
             raise KeyError(f"Configuration section '{section}' not found")
 
         return self.config[section].copy()
+
+    def load_profile(self, profile_name: str) -> 'ConfigManager':
+        """
+        Load configuration profile and return a new ConfigManager instance.
+
+        This is a convenience method that creates a new ConfigManager with the specified profile.
+
+        Args:
+            profile_name: Name of profile (dev, prod, testing)
+
+        Returns:
+            ConfigManager instance with profile loaded
+
+        Raises:
+            FileNotFoundError: If profile file doesn't exist
+        """
+        return ConfigManager(profile=profile_name)
 
     def to_dataclass(self) -> Config:
         """Convert configuration to Config dataclass"""

@@ -94,7 +94,7 @@ class TestConfigManager:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Configuration validation failed"):
+            with pytest.raises(ValueError, match="Configuration Validation Error"):
                 ConfigManager(config_path=temp_path)
         finally:
             os.unlink(temp_path)
@@ -109,7 +109,7 @@ class TestConfigManager:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Configuration validation failed"):
+            with pytest.raises(ValueError, match="Configuration Validation Error"):
                 ConfigManager(config_path=temp_path)
         finally:
             os.unlink(temp_path)
@@ -124,7 +124,7 @@ class TestConfigManager:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Configuration validation failed"):
+            with pytest.raises(ValueError, match="Configuration Validation Error"):
                 ConfigManager(config_path=temp_path)
         finally:
             os.unlink(temp_path)
@@ -248,3 +248,205 @@ class TestConfigManager:
         assert 'ConfigManager' in repr_str
         assert 'model' in repr_str
         assert 'device' in repr_str
+
+
+class TestConfigValidationEnhanced:
+    """Enhanced validation tests for Story 1.2"""
+
+    def test_valid_configuration_passes_validation(self):
+        """Test that a valid configuration passes all validation rules"""
+        config = ConfigManager()
+        # Should not raise any exception
+        config._validate_config()
+
+    def test_confidence_threshold_out_of_range_high(self):
+        """Test confidence threshold > 1.0 shows clear error message"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            config_data = {
+                'detection': {'confidence_threshold': 1.5}
+            }
+            yaml.dump(config_data, f)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager(config_path=temp_path)
+
+            error_msg = str(exc_info.value)
+            assert 'confidence_threshold' in error_msg
+            assert '1.5' in error_msg or '1.50' in error_msg
+            assert '0.0' in error_msg
+            assert '1.0' in error_msg
+        finally:
+            os.unlink(temp_path)
+
+    def test_confidence_threshold_out_of_range_low(self):
+        """Test confidence threshold < 0.0 shows clear error message"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            config_data = {
+                'detection': {'confidence_threshold': -0.1}
+            }
+            yaml.dump(config_data, f)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager(config_path=temp_path)
+
+            error_msg = str(exc_info.value)
+            assert 'confidence_threshold' in error_msg
+            assert '0.0' in error_msg
+        finally:
+            os.unlink(temp_path)
+
+    def test_iou_threshold_out_of_range_high(self):
+        """Test IOU threshold > 1.0 shows clear error message"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            config_data = {
+                'detection': {'iou_threshold': 1.2}
+            }
+            yaml.dump(config_data, f)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager(config_path=temp_path)
+
+            error_msg = str(exc_info.value)
+            assert 'iou_threshold' in error_msg
+            assert '0.0' in error_msg
+            assert '1.0' in error_msg
+        finally:
+            os.unlink(temp_path)
+
+    def test_max_detections_out_of_range(self):
+        """Test max_detections validation"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            config_data = {
+                'detection': {'max_detections': 0}  # Too low
+            }
+            yaml.dump(config_data, f)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager(config_path=temp_path)
+
+            error_msg = str(exc_info.value)
+            assert 'max_detections' in error_msg
+        finally:
+            os.unlink(temp_path)
+
+    def test_target_size_invalid_list_length(self):
+        """Test target_size with invalid list length"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            config_data = {
+                'preprocessing': {'target_size': [640]}  # Only 1 element
+            }
+            yaml.dump(config_data, f)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager(config_path=temp_path)
+
+            error_msg = str(exc_info.value)
+            assert 'target_size' in error_msg
+        finally:
+            os.unlink(temp_path)
+
+    def test_device_type_invalid_value(self):
+        """Test invalid device type with helpful error"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            config_data = {
+                'device': {'type': 'invalid_device_type'},
+                'preprocessing': {'target_size': [640, 640]},  # Valid to avoid other errors
+                'detection': {'confidence_threshold': 0.5, 'iou_threshold': 0.4, 'max_detections': 100}
+            }
+            yaml.dump(config_data, f)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager(config_path=temp_path)
+
+            error_msg = str(exc_info.value)
+            assert 'device.type' in error_msg or 'Device type' in error_msg
+        finally:
+            os.unlink(temp_path)
+
+    def test_model_path_required_missing(self):
+        """Test that model.path is required"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            config_data = {
+                'model': {}  # Missing path
+            }
+            yaml.dump(config_data, f)
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError) as exc_info:
+                ConfigManager(config_path=temp_path)
+
+            error_msg = str(exc_info.value)
+            # Should have some validation error
+            assert len(error_msg) > 0
+        finally:
+            os.unlink(temp_path)
+
+
+class TestProfileLoading:
+    """Profile loading tests for Story 1.2"""
+
+    def test_load_profile_prod(self):
+        """Test loading production profile"""
+        config = ConfigManager(profile='prod')
+
+        # Check prod-specific settings
+        assert config.get('device', 'type') == 'auto'
+        assert config.get('logging', 'level') == 'INFO'
+
+    def test_load_profile_dev(self):
+        """Test loading development profile"""
+        config = ConfigManager(profile='dev')
+
+        # Check dev-specific settings
+        assert config.get('device', 'type') == 'cpu'
+        assert config.get('logging', 'level') == 'DEBUG'
+
+    def test_load_profile_testing(self):
+        """Test loading testing profile"""
+        config = ConfigManager(profile='testing')
+
+        # Check testing-specific settings
+        assert config.get('device', 'type') == 'cpu'
+        assert config.get('metrics', 'enabled') is False
+
+    def test_profile_overrides_base_config(self):
+        """Test that profile settings override base config"""
+        config = ConfigManager(profile='dev')
+
+        # dev.yaml should override confidence_threshold
+        assert config.get('detection', 'confidence_threshold') == 0.3
+
+    def test_missing_profile_error_message(self):
+        """Test helpful error message when profile doesn't exist"""
+        with pytest.raises(FileNotFoundError) as exc_info:
+            ConfigManager(profile='nonexistent_profile')
+
+        error_msg = str(exc_info.value)
+        assert 'nonexistent_profile' in error_msg
+        # Should list available profiles
+        assert ('dev' in error_msg or 'prod' in error_msg or 'testing' in error_msg)
+
+    def test_list_available_profiles(self):
+        """Test _list_available_profiles helper method"""
+        config = ConfigManager()
+        profiles = config._list_available_profiles()
+
+        assert isinstance(profiles, dict)
+        # Should at least have the three default profiles
+        assert 'dev' in profiles or 'prod' in profiles or 'testing' in profiles
+        # Should have descriptions
+        if 'dev' in profiles:
+            assert 'debug logging' in profiles['dev'].lower()

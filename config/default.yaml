@@ -18,6 +18,11 @@ detection:
   max_detections: 100  # Maximum number of detections to return
   batch_size: 1  # Batch size for inference
 
+preprocessing:
+  target_size: [640, 640]  # Target [width, height] for preprocessing
+  letterbox: true  # Apply letterbox padding
+  normalize: true  # Normalize pixel values
+
 logging:
   level: INFO  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
   format: json  # Log format: json, text
