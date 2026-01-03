@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 
 from src.config.config_manager import ConfigManager
 from src.models.model_manager import ModelManager
-from src.device.device_manager import DeviceManager
+from src.hardware.device_manager import DeviceManager as HardwareDeviceManager
 from src.cli.metrics import MetricsTracker
 from src.cli.output import OutputHandler
 from src.cli.interactive import run_interactive_detection
@@ -32,7 +32,7 @@ def create_detector(ctx, model, confidence, iou, device):
         device: Override device selection
 
     Returns:
-        Tuple of (detector, config, model_path, device_type)
+        Tuple of (config, model_path, device_manager)
     """
     try:
         # Load configuration
@@ -56,25 +56,50 @@ def create_detector(ctx, model, confidence, iou, device):
 
         # Initialize managers
         model_mgr = ModelManager()
-        device_mgr = DeviceManager()
+
+        # Get device from config or CLI override (AC: #2, #4)
+        device_str = config_mgr.get('device.type', default='auto')
+
+        # Create device manager with device string
+        device_mgr = HardwareDeviceManager(device_str=device_str)
+
+        # Validate device availability (AC: #3)
+        try:
+            device_mgr.validate_device()
+        except RuntimeError as e:
+            click.echo(f"Error: {e}", err=True)
+            raise SystemExit(1)
+
+        # Get device info for logging (AC: #1, #5)
+        device_info = device_mgr.get_device_info()
+
+        # Display device selection (AC: #1, #2)
+        if device_str == 'auto':
+            click.echo(f"Auto-detected device: {device_mgr.device_string} ({device_info.get('name', 'CPU')})")
+        elif device_str == 'cpu':
+            click.echo(f"Using device: cpu (forced)")
+        else:
+            click.echo(f"Using device: {device_mgr.device_string}")
+
+        # Show multi-GPU info if applicable (AC: #5)
+        if device_mgr.selected_device.value == 'cuda' and device_info.get('gpu_count', 0) > 1:
+            click.echo(f"Available GPUs: {device_info['gpu_count']}")
+            for i, gpu_info in enumerate(device_info.get('gpus', [])):
+                click.echo(f"  - cuda:{i} ({gpu_info['name']}, {gpu_info['memory_gb']}GB)")
 
         # Get model path (download if needed)
         model_name = config_mgr.get('model.path')
         model_path = model_mgr.get_model(model_name)
 
-        # Get device
-        device_type = config_mgr.get('device.type')
-        selected_device = device_mgr.get_device(device_type)
-
         if ctx.obj.get('verbose'):
-            click.echo(f"Configuration loaded:")
-            click.echo(f"  Model: {model_path}")
-            click.echo(f"  Device: {selected_device}")
-            click.echo(f"  Confidence: {config_mgr.get('detection.confidence_threshold')}")
-            click.echo(f"  IOU: {config_mgr.get('detection.iou_threshold')}")
+            click.echo(f"Model: {model_path}")
+            click.echo(f"Confidence: {config_mgr.get('detection.confidence_threshold')}")
+            click.echo(f"IOU: {config_mgr.get('detection.iou_threshold')}")
 
-        return config_mgr, model_path, selected_device
+        return config_mgr, model_path, device_mgr
 
+    except SystemExit:
+        raise
     except Exception as e:
         click.echo(f"Error initializing detector: {e}", err=True)
         raise SystemExit(1)
@@ -106,7 +131,7 @@ def run_detect(ctx, input, output, output_format, interactive,
         raise SystemExit(1)
 
     # Create detector
-    config_mgr, model_path, selected_device = create_detector(
+    config_mgr, model_path, device_mgr = create_detector(
         ctx, model, confidence, iou, device
     )
 
@@ -118,8 +143,11 @@ def run_detect(ctx, input, output, output_format, interactive,
         # Create detector instance
         detector = DetectorFactory.create_detector(model_type)
 
-        # Load model
-        detector.load_model(str(model_path), selected_device)
+        # Get torch device from device manager
+        torch_device = device_mgr.get_torch_device()
+
+        # Load model with device
+        detector.load_model(str(model_path), torch_device)
 
         if ctx.obj.get('verbose'):
             from src.detection.base import ModelInfo
