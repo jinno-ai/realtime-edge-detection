@@ -80,3 +80,7 @@ inference_results/
 
 # BMAD Method
 _bmad-output/
+
+# UCG Temp
+.ucg-temp/
+.ucg_hang_detection.json
