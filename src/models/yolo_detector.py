@@ -9,8 +9,16 @@ import numpy as np
 from typing import List, Tuple, Dict, Any, Optional, Union
 import time
 import warnings
+import sys
+from pathlib import Path
 
-from ..core.config import ConfigManager
+# Handle both relative and absolute imports
+try:
+    from ..core.config import ConfigManager
+except ImportError:
+    # When running directly or with sys.path manipulation
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from src.core.config import ConfigManager
 
 
 class YOLODetector:
