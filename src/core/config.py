@@ -127,13 +127,14 @@ class ConfigManager:
             if profile_config:
                 self._merge_configs(self._config, profile_config)
 
-        # 4. Validate configuration (before env var overrides)
-        self._validate_configuration()
-
-        # 5. Apply environment variable overrides LAST (highest priority)
+        # 4. Apply environment variable overrides (highest priority)
         env_overrides = self._load_env_overrides()
         if env_overrides:
             self._merge_configs(self._config, env_overrides)
+
+        # 5. Validate FINAL configuration (after ALL merges including env vars)
+        # This is critical to ensure env var overrides don't bypass validation
+        self._validate_configuration()
 
         # 6. Final validation after all merges
         self._validate_required_params()

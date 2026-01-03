@@ -137,67 +137,85 @@ class ConfigValidator:
                 error_message="IOU threshold must be between 0.0 and 1.0",
                 hint="Set detection.iou_threshold to a value in [0.0, 1.0]"
             ),
+            # Issue #5: Reject float values for integer fields (bool is subclass of int in Python)
             ValidationRule(
                 parameter_path="detection.max_detections",
-                validator=lambda x: isinstance(x, int) and x >= 1,
-                error_message="Max detections must be a positive integer",
+                validator=lambda x: isinstance(x, int) and not isinstance(x, bool) and x >= 1,
+                error_message="Max detections must be a positive integer (not float or boolean)",
                 hint="Set detection.max_detections to an integer >= 1"
             ),
             ValidationRule(
                 parameter_path="detection.batch_size",
-                validator=lambda x: isinstance(x, int) and x >= 1,
-                error_message="Batch size must be a positive integer",
+                validator=lambda x: isinstance(x, int) and not isinstance(x, bool) and x >= 1,
+                error_message="Batch size must be a positive integer (not float or boolean)",
                 hint="Set detection.batch_size to an integer >= 1"
             ),
 
             # Device parameters
+            # Issue #3: Added .lower() for case-insensitive device type validation
             ValidationRule(
                 parameter_path="device.type",
-                validator=lambda x: isinstance(x, str) and x in [
+                validator=lambda x: isinstance(x, str) and x.lower() in [
                     'auto', 'cpu', 'cuda', 'cuda:0', 'cuda:1', 'mps', 'tpu', 'tflite', 'onnx'
                 ],
-                error_message="Device type must be one of: auto, cpu, cuda, mps, tpu, tflite, onnx",
+                error_message="Device type must be one of: auto, cpu, cuda, mps, tpu, tflite, onnx (case-insensitive)",
                 hint="Set device.type to a supported device (auto, cpu, cuda, mps, tpu, tflite, onnx)"
+            ),
+            # Issue #6: Added validator for device.optimize (boolean)
+            ValidationRule(
+                parameter_path="device.optimize",
+                validator=lambda x: isinstance(x, bool),
+                error_message="Device optimize must be a boolean (true/false)",
+                hint="Set device.optimize to true or false"
+            ),
+            # Issue #6: Added validator for device.quantization (null or string)
+            ValidationRule(
+                parameter_path="device.quantization",
+                validator=lambda x: x is None or (isinstance(x, str) and x.lower() in ['int8', 'fp16']),
+                error_message="Device quantization must be null or one of: int8, fp16",
+                hint="Set device.quantization to null, 'int8', or 'fp16'"
             ),
 
             # Logging parameters
+            # Issue #2: Logging level validator now case-insensitive (normalizes to uppercase)
             ValidationRule(
                 parameter_path="logging.level",
                 validator=lambda x: isinstance(x, str) and x.upper() in [
                     'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
                 ],
-                error_message="Log level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                error_message="Log level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL (case-insensitive)",
                 hint="Set logging.level to a valid log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
             ),
             ValidationRule(
                 parameter_path="logging.format",
                 validator=lambda x: isinstance(x, str) and x.lower() in ['text', 'json'],
-                error_message="Log format must be either 'text' or 'json'",
+                error_message="Log format must be either 'text' or 'json' (case-insensitive)",
                 hint="Set logging.format to 'text' or 'json'"
             ),
 
             # Metrics parameters
             ValidationRule(
                 parameter_path="metrics.port",
-                validator=lambda x: isinstance(x, int) and 1024 <= x <= 65535,
-                error_message="Metrics port must be between 1024 and 65535",
+                validator=lambda x: isinstance(x, int) and not isinstance(x, bool) and 1024 <= x <= 65535,
+                error_message="Metrics port must be between 1024 and 65535 (integer)",
                 hint="Set metrics.port to a valid port number (1024-65535)"
             ),
             ValidationRule(
                 parameter_path="metrics.export",
                 validator=lambda x: isinstance(x, str) and x.lower() in ['prometheus', 'json', 'none'],
-                error_message="Metrics export must be one of: prometheus, json, none",
+                error_message="Metrics export must be one of: prometheus, json, none (case-insensitive)",
                 hint="Set metrics.export to 'prometheus', 'json', or 'none'"
             ),
 
             # Model parameters
+            # Issue #7: Standardized on underscore naming convention (yolo_v8, yolov10)
             ValidationRule(
                 parameter_path="model.type",
                 validator=lambda x: isinstance(x, str) and x.lower() in [
-                    'yolo_v8', 'yolov8', 'yolov5', 'yolo_v5'
+                    'yolo_v8', 'yolov8', 'yolo_v10', 'yolov10', 'yolo_v5', 'yolov5'
                 ],
-                error_message="Model type must be one of: yolo_v8, yolov5",
-                hint="Set model.type to a supported model (yolo_v8, yolov5)"
+                error_message="Model type must be one of: yolo_v8, yolov10, yolov5 (case-insensitive)",
+                hint="Set model.type to a supported model (yolo_v8, yolov10, yolov5)"
             ),
             ValidationRule(
                 parameter_path="model.path",
