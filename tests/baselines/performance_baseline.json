@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-01-03T00:00:00+00:00",
+  "hardware": {
+    "platform": "Linux",
+    "cpu": "x86_64",
+    "gpu": null,
+    "ram_gb": 16.0,
+    "python_version": "3.14.2"
+  },
+  "metrics": {
+    "cpu_latency_ms": 25.0,
+    "gpu_latency_ms": null,
+    "memory_mb": 245.0,
+    "fps": 40.0,
+    "abstraction_overhead": 0.03,
+    "onnx_speedup": 1.8,
+    "quantization_speedup": 2.5
+  },
+  "test_config": {
+    "model": "yolov8n",
+    "image_size": [640, 640],
+    "iterations": 20,
+    "warmup": 5
+  }
+}

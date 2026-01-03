@@ -1,0 +1,148 @@
+name: Performance Benchmarks
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  benchmark-smoke:
+    name: Quick Performance Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run smoke tests
+        run: |
+          python scripts/run_benchmarks.py --smoke --output benchmark_results_smoke.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-smoke
+          path: benchmark_results_smoke.json
+          retention-days: 30
+
+  benchmark-full:
+    name: Detailed Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run full benchmarks
+        run: |
+          python scripts/run_benchmarks.py --output benchmark_results_full.json
+
+      - name: Check for regression
+        run: |
+          python scripts/check_regression.py benchmark_results_full.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-full
+          path: benchmark_results_full.json
+          retention-days: 90
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const results = JSON.parse(fs.readFileSync('benchmark_results_full.json', 'utf8'));
+
+              let comment = '## 📊 Performance Benchmark Results\n\n';
+              comment += `**Timestamp:** ${results.timestamp}\n\n`;
+              comment += '**Hardware:**\n';
+              comment += `- CPU: ${results.hardware.cpu.cores} cores, ${results.hardware.cpu.threads} threads\n`;
+              comment += `- RAM: ${results.hardware.ram.total_gb}GB\n`;
+              comment += `- GPU: ${results.hardware.gpu.available ? results.hardware.gpu.name : 'Not available'}\n\n`;
+              comment += '**Status:** ' + (results.success ? '✅ PASSED' : '❌ FAILED') + '\n\n';
+
+              if (results.benchmarks) {
+                comment += '### Results:\n\n';
+                for (const [name, data] of Object.entries(results.benchmarks)) {
+                  const status = data.status === 'PASS' ? '✅' : '❌';
+                  comment += `${status} **${name}**: ${data.description || ''}\n`;
+                  if (data.speedup) comment += `  - Speedup: ${data.speedup.toFixed(2)}x\n`;
+                  if (data.overhead_percent) comment += `  - Overhead: ${data.overhead_percent.toFixed(2)}%\n`;
+                }
+              }
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Could not post benchmark comment:', error);
+            }
+
+  benchmark-gpu:
+    name: GPU Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run GPU benchmarks
+        run: |
+          python scripts/run_benchmarks.py --output benchmark_results_gpu.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-gpu
+          path: benchmark_results_gpu.json
+          retention-days: 90

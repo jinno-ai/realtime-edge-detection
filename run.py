@@ -16,7 +16,11 @@ import time
 
 from src.models.yolo_detector import YOLODetector
 from src.preprocessing.image_processor import ImageProcessor
-from src.config.config_manager import ConfigManager
+from src.core.config import ConfigManager
+from src.observability.logger import StructuredLogger
+
+# Global logger instance
+logger = None
 
 
 def create_detector(args):
@@ -50,16 +54,31 @@ def create_detector(args):
     if hasattr(args, 'iou') and args.iou is not None:
         config['detection']['iou_threshold'] = args.iou
 
+    # Initialize logger
+    log_format = getattr(args, 'log_format', config.get('logging.format', 'json'))
+    log_file = config.get('logging.file', 'edge-detection.log')
+    log_level = config.get('logging.level', 'INFO')
+
+    global logger
+    logger = StructuredLogger(
+        name="edge-detection",
+        log_file=log_file if log_format == 'json' else None,  # Only log to file for JSON
+        format=log_format,
+        level=log_level
+    )
+
     # Create detector with config
     return YOLODetector(config=config)
 
 
 def detect_command(args):
     """Detect objects in image or directory"""
-    print("🔧 Initializing detector...")
+    if logger:
+        logger.info("Initializing detector")
     detector = create_detector(args)
 
-    print("🧠 Loading model...")
+    if logger:
+        logger.info("Loading model", context={'model_path': detector.model_path if hasattr(detector, 'model_path') else 'unknown'})
     detector.load_model()
 
     # Check if input is directory or single image
@@ -68,7 +87,11 @@ def detect_command(args):
         # Batch processing mode
         from src.core.batch_processor import BatchProcessor
 
-        print(f"\n📁 Batch processing mode")
+        if logger:
+            logger.info("Batch processing mode", context={
+                'input_dir': args.image,
+                'batch_size': args.batch_size
+            })
         batch_size = 'auto' if args.batch_size == 'auto' else int(args.batch_size)
         processor = BatchProcessor(
             detector=detector,
@@ -92,25 +115,42 @@ def detect_command(args):
             with open(error_log_path, 'w') as f:
                 for error in processor.error_log:
                     f.write(f"{error['timestamp']} - {error['image']}: {error['error']}\n")
-            print(f"\n📝 Error log saved to: {error_log_path}")
+            if logger:
+                logger.warning("Errors occurred during batch processing", context={
+                    'error_count': len(processor.error_log),
+                    'error_log': error_log_path
+                })
 
     else:
         # Single image mode
         # Load image
-        print(f"📸 Loading image: {args.image}")
+        if logger:
+            logger.info("Loading image", context={'image_path': args.image})
         image = cv2.imread(args.image)
 
         if image is None:
-            print(f"❌ Error: Could not load image")
+            if logger:
+                logger.error("Could not load image", context={'image_path': args.image})
             sys.exit(1)
 
         # Detect
-        print("🔍 Detecting objects...")
+        if logger:
+            logger.info("Starting detection")
         start_time = time.time()
         detections = detector.detect(image)
         inference_time = time.time() - start_time
 
         # Results
+        if logger:
+            logger.info("Detection complete", context={
+                'image_path': args.image,
+                'detection_count': len(detections)
+            }, metrics={
+                'latency_ms': inference_time * 1000,
+                'fps': 1 / inference_time if inference_time > 0 else 0,
+                'detections': len(detections)
+            })
+
         print(f"\n✅ Found {len(detections)} objects in {inference_time*1000:.1f}ms")
 
         if detections:
@@ -122,6 +162,8 @@ def detect_command(args):
         if args.output:
             result = detector.draw_detections(image, detections)
             cv2.imwrite(args.output, result)
+            if logger:
+                logger.info("Saved result", context={'output_path': args.output})
             print(f"\n💾 Saved result to: {args.output}")
 
         # Show if requested
@@ -314,6 +356,8 @@ Examples:
     common_args.add_argument('--model', help='Model path (overrides config)')
     common_args.add_argument('--confidence', type=float, help='Confidence threshold (overrides config)')
     common_args.add_argument('--iou', type=float, help='IOU threshold (overrides config)')
+    common_args.add_argument('--log-format', choices=['json', 'text'], default='json',
+                           help='Log format (json or text, default: json)')
 
     # Detect command
     detect_parser = subparsers.add_parser(

@@ -42,8 +42,10 @@ def cli(ctx, config, profile, verbose):
 @click.option('--device', type=str, help='Override device selection (auto/cpu/cuda/mps)')
 @click.option('--batch', is_flag=True, help='Batch processing mode for multiple inputs')
 @click.option('--benchmark', is_flag=True, help='Benchmark mode for performance testing')
+@click.option('--metrics', type=click.Choice(['none', 'prometheus'], case_sensitive=False),
+              default='none', help='Enable metrics collection (none/prometheus)')
 @click.pass_context
-def detect(ctx, input, output, output_format, interactive, model, confidence, iou, device, batch, benchmark):
+def detect(ctx, input, output, output_format, interactive, model, confidence, iou, device, batch, benchmark, metrics):
     """
     Run object detection on image or video.
 
@@ -60,13 +62,16 @@ def detect(ctx, input, output, output_format, interactive, model, confidence, io
 
         # Batch processing with custom confidence
         edge-detection detect *.jpg --confidence 0.7 --batch
+
+        # Enable Prometheus metrics
+        edge-detection detect video.mp4 --metrics prometheus
     """
     from src.cli.detect import run_detect
 
     # Run detection
     run_detect(
         ctx, input, output, output_format, interactive,
-        model, confidence, iou, device, batch, benchmark
+        model, confidence, iou, device, batch, benchmark, metrics
     )
 
 

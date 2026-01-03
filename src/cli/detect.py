@@ -18,6 +18,7 @@ from src.cli.metrics import MetricsTracker
 from src.cli.output import OutputHandler
 from src.cli.interactive import run_interactive_detection
 from src.detection.factory import DetectorFactory
+from src.metrics.manager import MetricsManager
 
 
 def create_detector(ctx, model, confidence, iou, device):
@@ -106,7 +107,7 @@ def create_detector(ctx, model, confidence, iou, device):
 
 
 def run_detect(ctx, input, output, output_format, interactive,
-               model, confidence, iou, device, batch, benchmark):
+               model, confidence, iou, device, batch, benchmark, metrics_mode='none'):
     """
     Run detection on input file.
 
@@ -122,6 +123,7 @@ def run_detect(ctx, input, output, output_format, interactive,
         device: Override device selection
         batch: Batch processing flag
         benchmark: Benchmark mode flag
+        metrics_mode: Metrics collection mode ('none', 'prometheus')
     """
     input_path = Path(input)
 
@@ -165,41 +167,54 @@ def run_detect(ctx, input, output, output_format, interactive,
         click.echo(f"Error loading detector: {e}", err=True)
         raise SystemExit(1)
 
-    # Initialize metrics tracker
-    metrics = MetricsTracker()
+    # Initialize metrics manager
+    metrics_manager = MetricsManager(mode=metrics_mode)
+
+    # Start Prometheus server if enabled
+    if metrics_mode == 'prometheus':
+        try:
+            metrics_manager.start_prometheus_server()
+            click.echo(f"Prometheus metrics available at http://localhost:9090/metrics")
+        except Exception as e:
+            click.echo(f"Warning: Could not start Prometheus server: {e}", err=True)
 
     # Process input based on type
-    if interactive:
-        # Interactive mode
-        run_interactive_detection(detector, input_path, config_mgr, metrics)
-    else:
-        # Single file detection
-        if input_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']:
-            # Image
-            results = process_image(detector, input_path, metrics)
-        elif input_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
-            # Video
-            results = process_video(detector, input_path, metrics)
+    try:
+        if interactive:
+            # Interactive mode
+            run_interactive_detection(detector, input_path, config_mgr, metrics_manager)
         else:
-            click.echo(f"Error: Unsupported file type: {input_path.suffix}", err=True)
-            raise SystemExit(1)
+            # Single file detection
+            if input_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']:
+                # Image
+                results = process_image(detector, input_path, metrics_manager)
+            elif input_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
+                # Video
+                results = process_video(detector, input_path, metrics_manager)
+            else:
+                click.echo(f"Error: Unsupported file type: {input_path.suffix}", err=True)
+                raise SystemExit(1)
 
-        # Handle output
-        handle_output(results, input_path, output, output_format, config_mgr)
+            # Handle output
+            handle_output(results, input_path, output, output_format, config_mgr)
 
-        # Display metrics
-        stats = metrics.get_stats()
-        click.echo(metrics.format_stats(stats))
+            # Display metrics
+            stats = metrics_manager.get_stats()
+            click.echo(metrics_manager.format_stats(stats))
+
+    finally:
+        # Cleanup metrics manager
+        metrics_manager.cleanup()
 
 
-def process_image(detector, image_path: Path, metrics: MetricsTracker) -> Dict:
+def process_image(detector, image_path: Path, metrics_manager: MetricsManager) -> Dict:
     """
     Process single image for detection.
 
     Args:
         detector: AbstractDetector instance
         image_path: Path to input image
-        metrics: Metrics tracker
+        metrics_manager: Metrics manager
 
     Returns:
         Dictionary with detection results
@@ -214,9 +229,13 @@ def process_image(detector, image_path: Path, metrics: MetricsTracker) -> Dict:
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # Run detection
-    metrics.start_inference()
-    result = detector.detect(image_rgb)
-    inference_time = metrics.end_inference()
+    metrics_manager.start_inference()
+    try:
+        result = detector.detect(image_rgb)
+        inference_time = metrics_manager.end_inference()
+    except Exception as e:
+        metrics_manager.record_error()
+        raise
 
     # Parse results from DetectionResult
     detections = parse_detection_result(result, detector)
@@ -228,14 +247,14 @@ def process_image(detector, image_path: Path, metrics: MetricsTracker) -> Dict:
     }
 
 
-def process_video(detector, video_path: Path, metrics: MetricsTracker) -> Dict:
+def process_video(detector, video_path: Path, metrics_manager: MetricsManager) -> Dict:
     """
     Process video for detection.
 
     Args:
         detector: AbstractDetector instance
         video_path: Path to input video
-        metrics: Metrics tracker
+        metrics_manager: Metrics manager
 
     Returns:
         Dictionary with detection results
@@ -268,9 +287,13 @@ def process_video(detector, video_path: Path, metrics: MetricsTracker) -> Dict:
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             # Run detection
-            metrics.start_inference()
-            result = detector.detect(frame_rgb)
-            inference_time = metrics.end_inference()
+            metrics_manager.start_inference()
+            try:
+                result = detector.detect(frame_rgb)
+                inference_time = metrics_manager.end_inference()
+            except Exception as e:
+                metrics_manager.record_error()
+                raise
 
             # Parse results from DetectionResult
             detections = parse_detection_result(result, detector)
