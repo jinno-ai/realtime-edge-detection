@@ -36,12 +36,14 @@ class ErrorCode(Enum):
     E003: DEVICE_ERROR
     E004: INFERENCE_FAILED
     E005: OUT_OF_MEMORY
+    E006: INVALID_CONFIG
     """
     MODEL_LOAD_FAILED = "E001"
     INVALID_IMAGE = "E002"
     DEVICE_ERROR = "E003"
     INFERENCE_FAILED = "E004"
     OUT_OF_MEMORY = "E005"
+    INVALID_CONFIG = "E006"
 
 
 # ============================================================================
@@ -322,6 +324,12 @@ class ErrorHandler:
         if code == ErrorCode.INVALID_IMAGE:
             message = f"Invalid image format: {details}. Supported formats: JPG, PNG, WEBP"
             hint = "Verify the image file is not corrupted"
+
+        elif code == ErrorCode.INVALID_CONFIG:
+            message = f"Configuration error: {details}"
+            if context and 'parameter' in context:
+                message = f"Invalid configuration parameter '{context['parameter']}': {details}"
+            hint = "Check your configuration file syntax and parameter values"
 
         elif code == ErrorCode.OUT_OF_MEMORY:
             message = f"Out of memory. {details}"
