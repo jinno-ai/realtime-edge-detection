@@ -244,6 +244,18 @@ def preprocess_command(args):
     print(f"✅ Preprocessed: {preprocessed.shape}")
 
 
+def export_command(args):
+    """Export model to ONNX format"""
+    from src.commands.export import main as export_main
+    return export_main(args)
+
+
+def quantize_command(args):
+    """Quantize model for optimized inference"""
+    from src.commands.quantize import main as quantize_main
+    return quantize_main(args)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Real-time Edge Detection CLI",
@@ -292,6 +304,47 @@ Examples:
     pre_parser = subparsers.add_parser('preprocess', help='Test image preprocessing')
     pre_parser.add_argument('image', help='Input image path')
 
+    # Export command
+    export_parser = subparsers.add_parser(
+        'export',
+        help='Export model to ONNX format',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python run.py export --model yolov8n.pt --format onnx
+  python run.py export --model yolov8n.pt --format onnx --opset 17
+  python run.py export --model yolov8n.pt --format onnx --dynamic-batch
+        """
+    )
+    export_parser.add_argument('--model', required=True, help='Path to PyTorch model')
+    export_parser.add_argument('--format', choices=['onnx'], default='onnx', help='Output format')
+    export_parser.add_argument('--opset', type=int, default=17, help='ONNX opset version')
+    export_parser.add_argument('--dynamic-batch', action='store_true', help='Enable dynamic batch')
+    export_parser.add_argument('--optimize', choices=['none', 'basic', 'all'], default='all', help='Optimization level')
+    export_parser.add_argument('--output-dir', help='Output directory')
+    export_parser.add_argument('--output-name', help='Output model name')
+
+    # Quantize command
+    quantize_parser = subparsers.add_parser(
+        'quantize',
+        help='Quantize model for optimized inference',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python run.py quantize --model yolov8n.pt --format int8
+  python run.py quantize --model yolov8n.pt --format fp16
+  python run.py quantize --model yolov8n.pt --format int8 --skip-validation
+  python run.py quantize --model yolov8n.pt --format int8 --output ./models/yolov8n.int8.pt
+        """
+    )
+    quantize_parser.add_argument('--model', required=True, help='Path to PyTorch model file (.pt)')
+    quantize_parser.add_argument('--format', choices=['int8', 'fp16'], default='int8', help='Quantization format')
+    quantize_parser.add_argument('--backend', choices=['pytorch', 'tensorrt', 'onnx'], default='pytorch', help='Quantization backend')
+    quantize_parser.add_argument('--output', help='Output path for quantized model')
+    quantize_parser.add_argument('--calib-data', help='Path to calibration dataset for INT8')
+    quantize_parser.add_argument('--skip-validation', action='store_true', help='Skip accuracy validation')
+    quantize_parser.add_argument('--force', action='store_true', help='Force quantization even if accuracy degradation exceeds threshold')
+
     args = parser.parse_args()
 
     if args.command == 'detect':
@@ -304,6 +357,10 @@ Examples:
         benchmark_command(args)
     elif args.command == 'preprocess':
         preprocess_command(args)
+    elif args.command == 'export':
+        export_command(args)
+    elif args.command == 'quantize':
+        quantize_command(args)
     else:
         parser.print_help()
 
