@@ -68,15 +68,14 @@ development_status:
   3-7-セキュリティスキャンと脆弱性対策: ready-for-dev
   epic-3-retrospective: optional
   epic-4: backlog
-  4-1-ビデオストリーミング検出: ready-for-dev
-  4-10-デプロイガイドとパフォーマンスチューニング: ready-for-dev
-  4-11-ドキュメント自動生成とメンテナンス: ready-for-dev
-  4-2-マルチオブジェクトトラッキング: ready-for-dev
-  4-3-ゾーンモニタリングとイベント検知: ready-for-dev
-  4-4-コールバック-フックシステム: ready-for-dev
-  4-5-dockerコンテナ化: ready-for-dev
-  4-6-kubernetesデプロイ: ready-for-dev
-  4-7-fastapiflaskバックエンド統合: ready-for-dev
-  4-8-エッジクラウド通信: ready-for-dev
-  4-9-モデル精度検証スイート: ready-for-dev
+  4-1-ビデオストリーミング検出: review
+  4-10-デプロイガイドとパフォーマンスチューニング: review
+  4-2-マルチオブジェクトトラッキング: review
+  4-3-ゾーンモニタリングとイベント検知: review
+  4-4-コールバック-フックシステム: review
+  4-5-dockerコンテナ化: review
+  4-6-kubernetesデプロイ: review
+  4-7-fastapiflaskバックエンド統合: review
+  4-8-エッジクラウド通信: review
+  4-9-モデル精度検証スイート: review
   epic-4-retrospective: optional
