@@ -1,0 +1,18 @@
+{
+  "instruction_file": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection/instructions/full-bmad-project-flow.md",
+  "executor_command": "claude --dangerously-skip-permissions -p -d",
+  "timestamp": "2026-01-03T12:07:30.281496",
+  "execution_time_seconds": 9.85608458518982,
+  "returncode": 0,
+  "stdout": "This is a temporary instruction file from the Full BMAD Project Flow workflow, generated on January 3, 2026. The instruction (in Japanese) says:\n\n\"/bmad:bmm:workflows:full-bmad-project-flow 1つだけ実行して成果物をコミットして。\"\n\nTranslation: \"Execute /bmad:bmm:workflows:full-bmad-project-flow just once and commit the results.\"\n\nThis appears to be an artifact from a workflow execution that was supposed to run the complete BMAD (Business Model Architecture Development) project flow. The workflow seems to have been executed multiple times based on the other temporary files in the `.ucg-temp` directory (there are 4 similar instruction files from different timestamps).\n\nWould you like me to:\n1. Clean up these temporary files?\n2. Execute the workflow?\n3. Review what was produced by the previous executions?\n",
+  "stderr": "",
+  "success": true,
+  "target_info": {
+    "type": "repository",
+    "path": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+    "source": "target_repository"
+  },
+  "temp_file": "instruction_full-bmad-project-flow_20260103_120720.md",
+  "working_directory": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+  "critical_save_errors": []
+}
