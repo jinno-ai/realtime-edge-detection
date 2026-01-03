@@ -50,8 +50,8 @@ development_status:
   1-7-既存コードのリファクタリング: review
   epic-1-retrospective: optional
   epic-2: in-progress
-  2-1-抽象モデルインターフェース: review
-  2-2-モデルバージョニングと互換性チェック: ready-for-dev
+  2-1-抽象モデルインターフェース: done
+  2-2-モデルバージョニングと互換性チェック: in-progress
   2-3-onnx変換と最適化: ready-for-dev
   2-4-量子化パイプライン: ready-for-dev
   2-5-バッチ処理cli: ready-for-dev

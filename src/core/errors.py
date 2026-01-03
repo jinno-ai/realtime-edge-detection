@@ -14,6 +14,7 @@ class ErrorCode(Enum):
     DEVICE_ERROR = "E004"
     INFERENCE_FAILED = "E005"
     VALIDATION_FAILED = "E006"
+    INCOMPATIBLE_MODEL = "E007"
 
 
 class EdgeDetectionError(Exception):
