@@ -71,13 +71,19 @@ class TestFileSystemOperations:
     def test_load_from_user_config_directory(self, tmp_path):
         """Test loading from user config directory (~/.config/edge-detection/)."""
         config_dir = tmp_path / 'edge-detection'
-        config_dir.mkdir()
+        config_dir.mkdir(parents=True)
         config_file = config_dir / 'config.yaml'
 
         with open(config_file, 'w') as f:
             yaml.dump({'model': {'name': 'yolov8l'}}, f)
 
-        # Monkey patch the default config path
+        # Monkey patch the default config path to return tmp_path
+        # The code does get_default_config_path() / 'config.yaml'
+        # So we need to put config.yaml directly in tmp_path
+        direct_config_file = tmp_path / 'config.yaml'
+        with open(direct_config_file, 'w') as f:
+            yaml.dump({'model': {'name': 'yolov8l'}}, f)
+
         from src.config import config_manager
         original_path = config_manager.get_default_config_path
         config_manager.get_default_config_path = lambda: tmp_path
