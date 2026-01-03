@@ -1,0 +1,52 @@
+# Example configuration for edge-detection toolkit
+# Copy this file to ~/.config/edge-detection/config.yaml and customize
+
+# Model configuration
+model:
+  name: yolov8s  # Use small model for better accuracy
+  # path: /path/to/custom/model.pt  # Uncomment to use custom model
+  cache_dir: ~/.cache/edge-detection/models
+
+# Device configuration
+device:
+  type: auto  # Automatically detect best device
+  # For GPU: type: cuda
+  # For CPU: type: cpu
+  # For specific GPU: type: cuda:0
+
+# Detection parameters
+detection:
+  confidence_threshold: 0.30  # Higher confidence for fewer false positives
+  iou_threshold: 0.45  # IOU threshold for NMS
+  max_detections: 100  # Limit detections for performance
+
+# Input preprocessing
+input:
+  image_size: [640, 640]  # Standard YOLO input size
+  letterbox: true  # Maintain aspect ratio with padding
+  normalize: true  # Normalize to [0, 1]
+
+# Output settings
+output:
+  save_dir: ./output  # Results directory
+  format: jpg  # JPEG format for smaller file size
+  show_confidence: true  # Display confidence scores
+  show_labels: true  # Display class names
+
+# Logging configuration
+logging:
+  level: INFO  # Information level logging
+  format: text  # Human-readable text format
+  file: ./output/detection.log  # Optional log file
+
+# Performance settings
+performance:
+  half_precision: false  # Enable FP16 for faster GPU inference
+  batch_size: 1  # Batch size (increase for GPU)
+  workers: 4  # Data loading workers
+
+# Environment variables override:
+# Export environment variables with EDGE_DETECTION_ prefix:
+#   export EDGE_DETECTION_MODEL__NAME=yolov8m
+#   export EDGE_DETECTION_DETECTION__CONFIDENCE_THRESHOLD=0.5
+#   export EDGE_DETECTION_DEVICE__TYPE=cuda

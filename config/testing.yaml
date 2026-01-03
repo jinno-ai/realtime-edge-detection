@@ -1,30 +1,36 @@
-# Testing environment configuration
-# Overrides default.yaml for automated testing
+# Testing/CI profile - deterministic and reproducible
+# Usage: --profile testing
 
 model:
-  type: yolo_v8
-  path: yolov8n.pt
-  download: false  # Don't download during tests
-  cache_dir: ~/.cache/edge-detection/models
+  name: yolov8n
+  path: null
 
 device:
-  type: cpu  # Use CPU for testing (portable)
-  optimize: false
-  quantization: null
+  type: cpu  # Fixed device for reproducibility
+  auto_detect: false
 
 detection:
   confidence_threshold: 0.5
   iou_threshold: 0.4
-  max_detections: 100
-  batch_size: 1  # Single image batch for testing
+  max_detections: 300
+
+input:
+  image_size: [640, 640]
+  letterbox: true
+  normalize: true
+
+output:
+  save_dir: ./output
+  format: jpg
+  show_confidence: true
+  show_labels: true
 
 logging:
-  level: DEBUG  # Verbose logging for debugging tests
-  format: text  # Human-readable format
+  level: WARNING  # Reduce noise in CI
+  format: text
   file: null
-  rotation: 10MB
 
-metrics:
-  enabled: false  # Disable metrics during tests
-  export: prometheus
-  port: 9090
+performance:
+  half_precision: false
+  batch_size: 1
+  workers: 1  # Single worker for determinism

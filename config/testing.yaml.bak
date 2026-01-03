@@ -1,0 +1,30 @@
+# Testing environment configuration
+# Overrides default.yaml for automated testing
+
+model:
+  type: yolo_v8
+  path: yolov8n.pt
+  download: false  # Don't download during tests
+  cache_dir: ~/.cache/edge-detection/models
+
+device:
+  type: cpu  # Use CPU for testing (portable)
+  optimize: false
+  quantization: null
+
+detection:
+  confidence_threshold: 0.5
+  iou_threshold: 0.4
+  max_detections: 100
+  batch_size: 1  # Single image batch for testing
+
+logging:
+  level: DEBUG  # Verbose logging for debugging tests
+  format: text  # Human-readable format
+  file: null
+  rotation: 10MB
+
+metrics:
+  enabled: false  # Disable metrics during tests
+  export: prometheus
+  port: 9090

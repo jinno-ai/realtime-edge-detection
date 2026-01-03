@@ -1,0 +1,25 @@
+# Production configuration
+model:
+  path: yolov8s.pt  # Larger model for production
+  type: yolov8
+  cache_dir: ~/.cache/edge-detection/models
+
+device:
+  type: cuda  # Use GPU in production
+  fallback: cpu
+  gpu_id: 0
+
+detection:
+  confidence_threshold: 0.5  # Higher threshold for production
+  iou_threshold: 0.5
+  max_detections: 300
+
+preprocessing:
+  target_size: [640, 640]
+  letterbox: true
+  normalize: true
+
+output:
+  format: json
+  save_dir: output
+  show_results: false  # Don't show results in production

@@ -1,9 +1,26 @@
 """
-Configuration Management for Edge Detection
+Configuration management module for edge-detection toolkit.
 
-Provides YAML-based configuration with environment variable overrides.
+Exports ConfigManager, validation schemas, and ProfileManager.
 """
 
-from .config_manager import ConfigManager, Config
+from .config_manager import ConfigManager, ConfigurationError
+from .validation import (
+    EdgeDetectionConfig,
+    ModelConfig,
+    DeviceConfig,
+    DetectionConfig,
+    validate_config
+)
+from .profile_manager import ProfileManager
 
-__all__ = ['ConfigManager', 'Config']
+__all__ = [
+    'ConfigManager',
+    'ConfigurationError',
+    'EdgeDetectionConfig',
+    'ModelConfig',
+    'DeviceConfig',
+    'DetectionConfig',
+    'validate_config',
+    'ProfileManager',
+]

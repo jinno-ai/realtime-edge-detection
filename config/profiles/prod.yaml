@@ -1,0 +1,10 @@
+# Production profile
+model:
+  name: yolov8m  # Better accuracy
+device:
+  type: auto
+detection:
+  confidence_threshold: 0.4  # Higher threshold for production
+logging:
+  level: WARNING
+  format: json

@@ -1,25 +1,36 @@
-# Development configuration
+# Development profile - optimized for debugging and testing
+# Usage: --profile dev
+
 model:
-  path: yolov8n.pt  # Small model for faster iteration
-  type: yolov8
-  cache_dir: ~/.cache/edge-detection/models
+  name: yolov8n
+  path: null
 
 device:
-  type: cpu  # Use CPU for development
-  fallback: cpu
-  gpu_id: 0
+  type: auto
+  auto_detect: true
 
 detection:
-  confidence_threshold: 0.25  # Lower threshold for testing
+  confidence_threshold: 0.25  # Lower for testing
   iou_threshold: 0.45
   max_detections: 300
 
-preprocessing:
-  target_size: [640, 640]
+input:
+  image_size: [640, 640]
   letterbox: true
   normalize: true
 
 output:
-  format: json
-  save_dir: output
-  show_results: true  # Show results for debugging
+  save_dir: ./output
+  format: jpg
+  show_confidence: true
+  show_labels: true
+
+logging:
+  level: DEBUG  # Verbose logging for development
+  format: text  # Human-readable format
+  file: null
+
+performance:
+  half_precision: false
+  batch_size: 1
+  workers: 4

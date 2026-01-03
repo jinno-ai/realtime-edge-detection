@@ -1,25 +1,36 @@
-# Production configuration
+# Production profile - optimized for performance
+# Usage: --profile prod
+
 model:
-  path: yolov8s.pt  # Larger model for production
-  type: yolov8
-  cache_dir: ~/.cache/edge-detection/models
+  name: yolov8n
+  path: null
 
 device:
-  type: cuda  # Use GPU in production
-  fallback: cpu
-  gpu_id: 0
+  type: auto
+  auto_detect: true
 
 detection:
   confidence_threshold: 0.5  # Higher threshold for production
-  iou_threshold: 0.5
+  iou_threshold: 0.4
   max_detections: 300
 
-preprocessing:
-  target_size: [640, 640]
+input:
+  image_size: [640, 640]
   letterbox: true
   normalize: true
 
 output:
-  format: json
-  save_dir: output
-  show_results: false  # Don't show results in production
+  save_dir: ./output
+  format: jpg
+  show_confidence: false  # Disable for production
+  show_labels: false
+
+logging:
+  level: INFO  # Standard logging
+  format: json  # Machine-readable for log aggregation
+  file: null
+
+performance:
+  half_precision: true  # Enable FP16 for better performance
+  batch_size: 16  # Higher batch size for throughput
+  workers: 4

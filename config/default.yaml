@@ -1,25 +1,44 @@
-# Default configuration for edge detection toolkit
+# Default configuration for edge-detection toolkit
+# This file contains default values for all configuration options
+
+# Model configuration
 model:
-  path: yolov8n.pt
-  type: yolov8
+  name: yolov8n  # Model name (yolov8n, yolov8s, yolov8m, yolov8l, yolov8x)
+  path: null  # Path to custom model file (null = auto-download)
   cache_dir: ~/.cache/edge-detection/models
 
+# Device configuration
 device:
-  type: auto  # auto, cpu, cuda, mps, tpu
-  fallback: cpu
-  gpu_id: 0
+  type: auto  # auto, cpu, cuda, cuda:0, mps, tpu, onnx
+  auto_detect: true  # Automatically detect available devices
 
+# Detection parameters
 detection:
-  confidence_threshold: 0.25
-  iou_threshold: 0.45
-  max_detections: 300
+  confidence_threshold: 0.25  # Minimum confidence for detections
+  iou_threshold: 0.45  # IOU threshold for NMS
+  max_detections: 300  # Maximum number of detections per image
 
-preprocessing:
-  target_size: [640, 640]
-  letterbox: true
-  normalize: true
+# Input preprocessing
+input:
+  image_size: [640, 640]  # Input image size [width, height]
+  letterbox: true  # Use letterbox resizing (maintain aspect ratio)
+  normalize: true  # Normalize pixel values
 
+# Output settings
 output:
-  format: json  # json, csv, coco
-  save_dir: output
-  show_results: true
+  save_dir: ./output  # Directory for saving results
+  format: jpg  # Output format (jpg, png)
+  show_confidence: true  # Show confidence scores on output
+  show_labels: true  # Show class labels on output
+
+# Logging configuration
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: text  # text, json
+  file: null  # Log file path (null = stdout only)
+
+# Performance settings
+performance:
+  half_precision: false  # Use FP16 (GPU only)
+  batch_size: 1  # Batch size for inference
+  workers: 4  # Number of worker threads for data loading
