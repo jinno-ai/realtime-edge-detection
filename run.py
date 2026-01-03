@@ -55,48 +55,82 @@ def create_detector(args):
 
 
 def detect_command(args):
-    """Detect objects in image"""
+    """Detect objects in image or directory"""
     print("🔧 Initializing detector...")
     detector = create_detector(args)
 
     print("🧠 Loading model...")
     detector.load_model()
 
-    # Load image
-    print(f"📸 Loading image: {args.image}")
-    image = cv2.imread(args.image)
+    # Check if input is directory or single image
+    import os
+    if os.path.isdir(args.image):
+        # Batch processing mode
+        from src.core.batch_processor import BatchProcessor
 
-    if image is None:
-        print(f"❌ Error: Could not load image")
-        sys.exit(1)
+        print(f"\n📁 Batch processing mode")
+        batch_size = 'auto' if args.batch_size == 'auto' else int(args.batch_size)
+        processor = BatchProcessor(
+            detector=detector,
+            batch_size=batch_size,
+            auto_batch=(args.batch_size == 'auto')
+        )
 
-    # Detect
-    print("🔍 Detecting objects...")
-    start_time = time.time()
-    detections = detector.detect(image)
-    inference_time = time.time() - start_time
+        # Process directory
+        stats = processor.process_directory(
+            input_dir=args.image,
+            output_csv=args.output_csv,
+            output_dir=args.output_dir
+        )
 
-    # Results
-    print(f"\n✅ Found {len(detections)} objects in {inference_time*1000:.1f}ms")
+        # Print summary
+        processor.print_summary()
 
-    if detections:
-        print("\n📊 Detections:")
-        for i, det in enumerate(detections, 1):
-            print(f"   {i}. {det['class_name']}: {det['confidence']:.3f}")
+        # Save error log if errors occurred
+        if processor.error_log:
+            error_log_path = 'batch_errors.log'
+            with open(error_log_path, 'w') as f:
+                for error in processor.error_log:
+                    f.write(f"{error['timestamp']} - {error['image']}: {error['error']}\n")
+            print(f"\n📝 Error log saved to: {error_log_path}")
 
-    # Draw and save
-    if args.output:
-        result = detector.draw_detections(image, detections)
-        cv2.imwrite(args.output, result)
-        print(f"\n💾 Saved result to: {args.output}")
+    else:
+        # Single image mode
+        # Load image
+        print(f"📸 Loading image: {args.image}")
+        image = cv2.imread(args.image)
 
-    # Show if requested
-    if args.show:
-        result = detector.draw_detections(image, detections)
-        cv2.imshow("Detections", result)
-        print("\n Press any key to close...")
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        if image is None:
+            print(f"❌ Error: Could not load image")
+            sys.exit(1)
+
+        # Detect
+        print("🔍 Detecting objects...")
+        start_time = time.time()
+        detections = detector.detect(image)
+        inference_time = time.time() - start_time
+
+        # Results
+        print(f"\n✅ Found {len(detections)} objects in {inference_time*1000:.1f}ms")
+
+        if detections:
+            print("\n📊 Detections:")
+            for i, det in enumerate(detections, 1):
+                print(f"   {i}. {det['class_name']}: {det['confidence']:.3f}")
+
+        # Draw and save
+        if args.output:
+            result = detector.draw_detections(image, detections)
+            cv2.imwrite(args.output, result)
+            print(f"\n💾 Saved result to: {args.output}")
+
+        # Show if requested
+        if args.show:
+            result = detector.draw_detections(image, detections)
+            cv2.imshow("Detections", result)
+            print("\n Press any key to close...")
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
 
 def webcam_command(args):
@@ -282,10 +316,28 @@ Examples:
     common_args.add_argument('--iou', type=float, help='IOU threshold (overrides config)')
 
     # Detect command
-    detect_parser = subparsers.add_parser('detect', help='Detect objects in image', parents=[common_args])
-    detect_parser.add_argument('image', help='Input image path')
-    detect_parser.add_argument('--output', help='Output image path')
-    detect_parser.add_argument('--show', action='store_true', help='Display result')
+    detect_parser = subparsers.add_parser(
+        'detect',
+        help='Detect objects in image or directory',
+        parents=[common_args],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Single image
+  python run.py detect image.jpg
+  python run.py detect image.jpg --show --output result.jpg
+
+  # Batch processing directory
+  python run.py detect images/ --batch-size 32
+  python run.py detect images/ --batch-size auto --output-csv results.csv
+        """
+    )
+    detect_parser.add_argument('image', help='Input image path or directory')
+    detect_parser.add_argument('--output', help='Output image path (single image mode)')
+    detect_parser.add_argument('--show', action='store_true', help='Display result (single image mode)')
+    detect_parser.add_argument('--batch-size', default='1', help='Batch size for directory mode (int or "auto")')
+    detect_parser.add_argument('--output-csv', help='Output CSV path for batch results')
+    detect_parser.add_argument('--output-dir', help='Output directory for annotated images (batch mode)')
 
     # Webcam command
     webcam_parser = subparsers.add_parser('webcam', help='Real-time webcam detection', parents=[common_args])
