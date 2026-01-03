@@ -1,0 +1,392 @@
+"""
+Detection command implementation.
+
+This module implements the core detection logic, integrating configuration
+management, model loading, device selection, and output formatting.
+"""
+
+import click
+import cv2
+import numpy as np
+from pathlib import Path
+from typing import Optional, Dict, Any
+
+from src.config.config_manager import ConfigManager
+from src.models.model_manager import ModelManager
+from src.device.device_manager import DeviceManager
+from src.cli.metrics import MetricsTracker
+from src.cli.output import OutputHandler
+from src.cli.interactive import run_interactive_detection
+
+
+def create_detector(ctx, model, confidence, iou, device):
+    """
+    Create detector with integrated configuration.
+
+    Args:
+        ctx: Click context
+        model: Override model path
+        confidence: Override confidence threshold
+        iou: Override IOU threshold
+        device: Override device selection
+
+    Returns:
+        Tuple of (detector, config, model_path, device_type)
+    """
+    try:
+        # Load configuration
+        config_mgr = ConfigManager(
+            config_path=ctx.obj.get('config'),
+            profile=ctx.obj.get('profile')
+        )
+
+        # Apply CLI overrides
+        if model:
+            config_mgr.config['model']['path'] = model
+        if confidence is not None:
+            config_mgr.config['detection']['confidence_threshold'] = confidence
+        if iou is not None:
+            config_mgr.config['detection']['iou_threshold'] = iou
+        if device:
+            config_mgr.config['device']['type'] = device
+
+        # Validate configuration
+        config_mgr.validate()
+
+        # Initialize managers
+        model_mgr = ModelManager()
+        device_mgr = DeviceManager()
+
+        # Get model path (download if needed)
+        model_name = config_mgr.get('model.path')
+        model_path = model_mgr.get_model(model_name)
+
+        # Get device
+        device_type = config_mgr.get('device.type')
+        selected_device = device_mgr.get_device(device_type)
+
+        if ctx.obj.get('verbose'):
+            click.echo(f"Configuration loaded:")
+            click.echo(f"  Model: {model_path}")
+            click.echo(f"  Device: {selected_device}")
+            click.echo(f"  Confidence: {config_mgr.get('detection.confidence_threshold')}")
+            click.echo(f"  IOU: {config_mgr.get('detection.iou_threshold')}")
+
+        return config_mgr, model_path, selected_device
+
+    except Exception as e:
+        click.echo(f"Error initializing detector: {e}", err=True)
+        raise SystemExit(1)
+
+
+def run_detect(ctx, input, output, output_format, interactive,
+               model, confidence, iou, device, batch, benchmark):
+    """
+    Run detection on input file.
+
+    Args:
+        ctx: Click context
+        input: Input file path
+        output: Output file path
+        output_format: Output format (json/csv/coco/visual)
+        interactive: Enable interactive mode
+        model: Override model path
+        confidence: Override confidence threshold
+        iou: Override IOU threshold
+        device: Override device selection
+        batch: Batch processing flag
+        benchmark: Benchmark mode flag
+    """
+    input_path = Path(input)
+
+    # Validate input file
+    if not input_path.exists():
+        click.echo(f"Error: Input file does not exist: {input}", err=True)
+        raise SystemExit(1)
+
+    # Create detector
+    config_mgr, model_path, selected_device = create_detector(
+        ctx, model, confidence, iou, device
+    )
+
+    # Load YOLO detector
+    try:
+        from ultralytics import YOLO
+
+        detector = YOLO(str(model_path))
+
+        # Set device
+        device_name = selected_device.replace('cuda', 'cuda:0')  # Ultralytics format
+        detector.to(device_name)
+
+    except Exception as e:
+        click.echo(f"Error loading model: {e}", err=True)
+        raise SystemExit(1)
+
+    # Initialize metrics tracker
+    metrics = MetricsTracker()
+
+    # Process input based on type
+    if interactive:
+        # Interactive mode
+        run_interactive_detection(detector, input_path, config_mgr, metrics)
+    else:
+        # Single file detection
+        if input_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']:
+            # Image
+            results = process_image(detector, input_path, metrics)
+        elif input_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
+            # Video
+            results = process_video(detector, input_path, metrics)
+        else:
+            click.echo(f"Error: Unsupported file type: {input_path.suffix}", err=True)
+            raise SystemExit(1)
+
+        # Handle output
+        handle_output(results, input_path, output, output_format, config_mgr)
+
+        # Display metrics
+        stats = metrics.get_stats()
+        click.echo(metrics.format_stats(stats))
+
+
+def process_image(detector, image_path: Path, metrics: MetricsTracker) -> Dict:
+    """
+    Process single image for detection.
+
+    Args:
+        detector: YOLO detector instance
+        image_path: Path to input image
+        metrics: Metrics tracker
+
+    Returns:
+        Dictionary with detection results
+    """
+    # Load image
+    image = cv2.imread(str(image_path))
+    if image is None:
+        click.echo(f"Error: Could not load image: {image_path}", err=True)
+        raise SystemExit(1)
+
+    # Run detection
+    metrics.start_inference()
+    results = detector(image)
+    inference_time = metrics.end_inference()
+
+    # Parse results
+    detections = parse_yolo_results(results, image.shape)
+
+    return {
+        'image': image,
+        'detections': detections,
+        'inference_time': inference_time
+    }
+
+
+def process_video(detector, video_path: Path, metrics: MetricsTracker) -> Dict:
+    """
+    Process video for detection.
+
+    Args:
+        detector: YOLO detector instance
+        video_path: Path to input video
+        metrics: Metrics tracker
+
+    Returns:
+        Dictionary with detection results
+    """
+    cap = cv2.VideoCapture(str(video_path))
+
+    if not cap.isOpened():
+        click.echo(f"Error: Could not open video: {video_path}", err=True)
+        raise SystemExit(1)
+
+    # Get video properties
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    all_detections = []
+
+    click.echo(f"Processing video: {total_frames} frames at {fps:.2f} FPS")
+
+    # Process frames with progress bar
+    from tqdm import tqdm
+
+    with tqdm(total=total_frames, desc="Detecting", unit="frames") as pbar:
+        frame_count = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Run detection
+            metrics.start_inference()
+            results = detector(frame)
+            inference_time = metrics.end_inference()
+
+            # Parse results
+            detections = parse_yolo_results(results, frame.shape)
+            all_detections.extend(detections)
+
+            # Update progress bar
+            pbar.set_postfix({
+                'FPS': f'{1.0/inference_time:.1f}' if inference_time > 0 else 'N/A',
+                'Objects': len(detections)
+            })
+            pbar.update(1)
+
+            frame_count += 1
+
+            # Limit for testing
+            if frame_count >= 1000:  # Safety limit
+                click.echo("\nWarning: Reached frame limit (1000)", err=True)
+                break
+
+    cap.release()
+
+    return {
+        'detections': all_detections,
+        'total_frames': frame_count
+    }
+
+
+def parse_yolo_results(results, image_shape) -> list:
+    """
+    Parse YOLO results into standard format.
+
+    Args:
+        results: YOLO results object
+        image_shape: Shape of original image (h, w, c)
+
+    Returns:
+        List of detection dictionaries
+    """
+    detections = []
+
+    for result in results:
+        boxes = result.boxes
+        if boxes is None:
+            continue
+
+        for box in boxes:
+            # Get box coordinates
+            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+
+            # Get confidence and class
+            confidence = float(box.conf[0].cpu().numpy())
+            class_id = int(box.cls[0].cpu().numpy())
+            class_name = result.names[class_id]
+
+            detections.append({
+                'bbox': [float(x1), float(y1), float(x2), float(y2)],
+                'confidence': confidence,
+                'class_id': class_id,
+                'class_name': class_name
+            })
+
+    return detections
+
+
+def handle_output(results: Dict, input_path: Path, output: Optional[str],
+                  output_format: str, config_mgr: ConfigManager) -> None:
+    """
+    Handle output formatting and saving.
+
+    Args:
+        results: Detection results
+        input_path: Input file path
+        output: Output file path (optional)
+        output_format: Output format
+        config_mgr: Configuration manager
+    """
+    # Determine output path
+    if output:
+        output_path = Path(output)
+    else:
+        # Generate default output path
+        output_path = Path('output') / f"{input_path.stem}_detections"
+        if output_format == 'visual':
+            output_path = output_path.with_suffix('.jpg')
+        elif output_format == 'json':
+            output_path = output_path.with_suffix('.json')
+        elif output_format == 'csv':
+            output_path = output_path.with_suffix('.csv')
+        elif output_format == 'coco':
+            output_path = output_path.with_suffix('.json')
+
+    detections = results.get('detections', [])
+
+    # Prepare metadata
+    metadata = {
+        'model': str(config_mgr.get('model.path')),
+        'device': str(config_mgr.get('device.type')),
+        'confidence_threshold': config_mgr.get('detection.confidence_threshold'),
+        'iou_threshold': config_mgr.get('detection.iou_threshold'),
+        'input_file': str(input_path)
+    }
+
+    # Export based on format
+    if output_format == 'json':
+        OutputHandler.to_json(detections, metadata, output_path)
+        click.echo(f"Results saved to: {output_path}")
+
+    elif output_format == 'csv':
+        OutputHandler.to_csv(detections, output_path)
+        click.echo(f"Results saved to: {output_path}")
+
+    elif output_format == 'coco':
+        image_info = {
+            'filename': input_path.name,
+            'width': results.get('image', np.zeros((0, 0, 0))).shape[1] if 'image' in results else 0,
+            'height': results.get('image', np.zeros((0, 0, 0))).shape[0] if 'image' in results else 0
+        }
+        OutputHandler.to_coco(detections, image_info, output_path)
+        click.echo(f"Results saved to: {output_path}")
+
+    elif output_format == 'visual':
+        if 'image' in results:
+            OutputHandler.to_visual(results['image'], detections, output_path)
+            click.echo(f"Annotated image saved to: {output_path}")
+        else:
+            click.echo("Warning: Visual output not available for video processing", err=True)
+
+
+def handle_config_command(action: str, config: Optional[str]) -> None:
+    """
+    Handle configuration management commands.
+
+    Args:
+        action: Action to perform (validate/show/list-profiles)
+        config: Config file path
+    """
+    if action == 'validate':
+        if not config:
+            click.echo("Error: --config option required for validate action", err=True)
+            raise SystemExit(1)
+
+        try:
+            config_mgr = ConfigManager(config_path=Path(config))
+            config_mgr.validate()
+            click.echo(f"✓ Configuration file is valid: {config}")
+        except Exception as e:
+            click.echo(f"✗ Configuration validation failed: {e}", err=True)
+            raise SystemExit(1)
+
+    elif action == 'show':
+        config_mgr = ConfigManager(config_path=Path(config) if config else None)
+        click.echo("\nCurrent Configuration:")
+        click.echo(f"  Model: {config_mgr.get('model.path')}")
+        click.echo(f"  Device: {config_mgr.get('device.type')}")
+        click.echo(f"  Confidence: {config_mgr.get('detection.confidence_threshold')}")
+        click.echo(f"  IOU: {config_mgr.get('detection.iou_threshold')}")
+
+    elif action == 'list-profiles':
+        config_dir = Path('config')
+        if config_dir.exists():
+            profiles = [f.stem for f in config_dir.glob('*.yaml')
+                       if f.stem not in ['default', 'example']]
+            click.echo("\nAvailable Profiles:")
+            for profile in profiles:
+                click.echo(f"  - {profile}")
+        else:
+            click.echo("No configuration profiles found")
