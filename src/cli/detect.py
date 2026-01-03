@@ -17,6 +17,7 @@ from src.device.device_manager import DeviceManager
 from src.cli.metrics import MetricsTracker
 from src.cli.output import OutputHandler
 from src.cli.interactive import run_interactive_detection
+from src.detection.factory import DetectorFactory
 
 
 def create_detector(ctx, model, confidence, iou, device):
@@ -109,18 +110,31 @@ def run_detect(ctx, input, output, output_format, interactive,
         ctx, model, confidence, iou, device
     )
 
-    # Load YOLO detector
+    # Create detector using factory
     try:
-        from ultralytics import YOLO
+        # Get model type from model path for factory
+        model_type = config_mgr.get('model.path')
 
-        detector = YOLO(str(model_path))
+        # Create detector instance
+        detector = DetectorFactory.create_detector(model_type)
 
-        # Set device
-        device_name = selected_device.replace('cuda', 'cuda:0')  # Ultralytics format
-        detector.to(device_name)
+        # Load model
+        detector.load_model(str(model_path), selected_device)
+
+        if ctx.obj.get('verbose'):
+            from src.detection.base import ModelInfo
+            model_info: ModelInfo = detector.get_model_info()
+            click.echo(f"  Detector Type: {type(detector).__name__}")
+            click.echo(f"  Model Name: {model_info.name}")
+            if model_info.version:
+                click.echo(f"  Model Version: {model_info.version}")
+            if model_info.input_size:
+                click.echo(f"  Input Size: {model_info.input_size}")
+            if model_info.class_names:
+                click.echo(f"  Classes: {len(model_info.class_names)}")
 
     except Exception as e:
-        click.echo(f"Error loading model: {e}", err=True)
+        click.echo(f"Error loading detector: {e}", err=True)
         raise SystemExit(1)
 
     # Initialize metrics tracker
@@ -155,7 +169,7 @@ def process_image(detector, image_path: Path, metrics: MetricsTracker) -> Dict:
     Process single image for detection.
 
     Args:
-        detector: YOLO detector instance
+        detector: AbstractDetector instance
         image_path: Path to input image
         metrics: Metrics tracker
 
@@ -168,13 +182,16 @@ def process_image(detector, image_path: Path, metrics: MetricsTracker) -> Dict:
         click.echo(f"Error: Could not load image: {image_path}", err=True)
         raise SystemExit(1)
 
+    # Convert BGR to RGB (AbstractDetector expects RGB)
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
     # Run detection
     metrics.start_inference()
-    results = detector(image)
+    result = detector.detect(image_rgb)
     inference_time = metrics.end_inference()
 
-    # Parse results
-    detections = parse_yolo_results(results, image.shape)
+    # Parse results from DetectionResult
+    detections = parse_detection_result(result, detector)
 
     return {
         'image': image,
@@ -188,7 +205,7 @@ def process_video(detector, video_path: Path, metrics: MetricsTracker) -> Dict:
     Process video for detection.
 
     Args:
-        detector: YOLO detector instance
+        detector: AbstractDetector instance
         video_path: Path to input video
         metrics: Metrics tracker
 
@@ -219,13 +236,16 @@ def process_video(detector, video_path: Path, metrics: MetricsTracker) -> Dict:
             if not ret:
                 break
 
+            # Convert BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
             # Run detection
             metrics.start_inference()
-            results = detector(frame)
+            result = detector.detect(frame_rgb)
             inference_time = metrics.end_inference()
 
-            # Parse results
-            detections = parse_yolo_results(results, frame.shape)
+            # Parse results from DetectionResult
+            detections = parse_detection_result(result, detector)
             all_detections.extend(detections)
 
             # Update progress bar
@@ -283,6 +303,46 @@ def parse_yolo_results(results, image_shape) -> list:
                 'class_id': class_id,
                 'class_name': class_name
             })
+
+    return detections
+
+
+def parse_detection_result(result, detector) -> list:
+    """
+    Parse DetectionResult into standard format.
+
+    Args:
+        result: DetectionResult from AbstractDetector
+        detector: AbstractDetector instance (for getting class names)
+
+    Returns:
+        List of detection dictionaries
+    """
+    from src.detection.base import DetectionResult
+
+    if not isinstance(result, DetectionResult):
+        raise TypeError(f"Expected DetectionResult, got {type(result)}")
+
+    # Get model info for class names
+    model_info = detector.get_model_info()
+    class_names = model_info.class_names or []
+
+    detections = []
+
+    for i in range(len(result.boxes)):
+        box = result.boxes[i]
+        confidence = float(result.scores[i])
+        class_id = int(result.classes[i])
+
+        # Get class name
+        class_name = class_names[class_id] if class_id < len(class_names) else f"class_{class_id}"
+
+        detections.append({
+            'bbox': box.tolist(),
+            'confidence': confidence,
+            'class_id': class_id,
+            'class_name': class_name
+        })
 
     return detections
 
