@@ -1,0 +1,59 @@
+[coverage]
+# Coverage configuration
+
+# Include these paths in coverage measurement
+source =
+    src
+
+# Omit these files/directories from coverage
+omit =
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */site-packages/*
+    */dist/*
+    setup.py
+    */migrations/*
+
+# Coverage precision
+precision = 2
+
+# Exclude lines from coverage
+exclude_lines =
+    # Default exclusions
+    pragma: no cover
+    def __repr__
+    def __str__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    if typing.TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+
+    # Additional exclusions
+    class .*\bProtocol\):
+    @[a-z_]*protocol
+
+[report]
+# Report configuration
+# Fail if total coverage is below 80%
+fail_under = 80.0
+
+# Show missing lines
+show_missing = True
+
+# Skip empty files
+skip_empty = True
+
+# Sort by missing lines
+sort = Cover
+
+[html]
+# HTML report configuration
+directory = htmlcov
+
+[xml]
+# XML report configuration (for CI/CD)
+output = coverage.xml
