@@ -1,0 +1,18 @@
+{
+  "instruction_file": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection/instructions/full-bmad-project-flow.md",
+  "executor_command": "claude --dangerously-skip-permissions -p -d",
+  "timestamp": "2026-01-03T10:54:40.903036",
+  "execution_time_seconds": 314.6663134098053,
+  "returncode": 0,
+  "stdout": "完了しました！\n\n**Full BMAD Project Flow 実行結果:**\n\n✅ 13個のワークフローすべてが正常に完了\n✅ 実装準備評価: PASS - Ready for Implementation\n✅ 成果物のコミット完了\n\n**プロジェクトの状態:**\n- 全31ストーリーが作成済み\n- プロジェクトドキュメント完備\n- テスト設計完了 (55シナリオ)\n- 実装準備完了状態\n\nこのプロジェクトは引き続き実装を進めることができます。\n",
+  "stderr": "",
+  "success": true,
+  "target_info": {
+    "type": "repository",
+    "path": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+    "source": "target_repository"
+  },
+  "temp_file": "instruction_full-bmad-project-flow_20260103_104926.md",
+  "working_directory": "/home/jinno/jinno-ai-portfolio-kit/realtime-edge-detection",
+  "critical_save_errors": []
+}
