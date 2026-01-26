@@ -12,6 +12,7 @@ import zipfile
 
 import numpy as np
 import cv2
+import torch
 
 
 class Calibrator:

@@ -5,7 +5,7 @@ Defines the common interface that all detector implementations must follow.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import numpy as np
 
 

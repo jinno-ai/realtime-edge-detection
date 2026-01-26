@@ -163,6 +163,26 @@ class ConfigManager:
 
         return value
 
+    def set(self, key: str, value: Any) -> None:
+        """
+        Set config value by dot-notation key
+
+        Args:
+            key: Dot-notation key (e.g., 'model.path')
+            value: Value to set
+        """
+        keys = key.split('.')
+        config = self._config
+
+        # Navigate to the parent of the final key
+        for k in keys[:-1]:
+            if k not in config:
+                config[k] = {}
+            config = config[k]
+
+        # Set the final key
+        config[keys[-1]] = value
+
     def validate(self) -> bool:
         """
         Validate configuration parameters

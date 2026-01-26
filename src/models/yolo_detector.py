@@ -69,17 +69,17 @@ class YOLODetector:
                     stacklevel=2
                 )
                 # Override config with legacy parameters
-                self.config.config['model']['path'] = model_path
+                self.config.set('model.path', model_path)
             if conf_threshold is not None:
-                self.config.config['detection']['confidence_threshold'] = conf_threshold
+                self.config.set('detection.confidence_threshold', conf_threshold)
             if iou_threshold is not None:
-                self.config.config['detection']['iou_threshold'] = iou_threshold
+                self.config.set('detection.iou_threshold', iou_threshold)
 
         # Load configuration values
-        self.model_path = self.config.get('model', 'path')
-        self.conf_threshold = self.config.get('detection', 'confidence_threshold')
-        self.iou_threshold = self.config.get('detection', 'iou_threshold')
-        self.max_detections = self.config.get('detection', 'max_detections')
+        self.model_path = self.config.get('model.path')
+        self.conf_threshold = self.config.get('detection.confidence_threshold')
+        self.iou_threshold = self.config.get('detection.iou_threshold')
+        self.max_detections = self.config.get('detection.max_detections')
 
         self.model = None
         self.class_names = []
