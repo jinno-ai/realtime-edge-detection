@@ -77,9 +77,13 @@ class YOLODetector:
 
         # Load configuration values
         self.model_path = self.config.get('model.path')
-        self.conf_threshold = self.config.get('detection.confidence_threshold')
-        self.iou_threshold = self.config.get('detection.iou_threshold')
-        self.max_detections = self.config.get('detection.max_detections')
+        # Use model name if path is not specified
+        if self.model_path is None:
+            model_name = self.config.get('model.name', 'yolov8n')
+            self.model_path = f"{model_name}.pt"
+        self.conf_threshold = self.config.get('detection.confidence_threshold', 0.25)
+        self.iou_threshold = self.config.get('detection.iou_threshold', 0.45)
+        self.max_detections = self.config.get('detection.max_detections', 300)
 
         self.model = None
         self.class_names = []
