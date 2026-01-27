@@ -1,0 +1,118 @@
+# realtime-edge-detection プロジェクト用設定
+# キー仕様: docs/KEY_SPEC.md 参照
+
+project:
+  name: "realtime-edge-detection"
+  provider: "github"
+  github:
+    owner: "jinno-ai"
+    repo: "realtime-edge-detection"
+    project_number: 2  # プロジェクトボード番号（存在しない場合は作成必要）
+  output_dir: "output_realtime"
+  # プロジェクトの技術コンテキスト（LLM分解で使用）
+  context: |
+    Real-time Edge Detection - YOLO v8ベースのエッジデバイス向け低遅延オブジェクト検出システム
+
+    現在の技術スタック:
+    - YOLO v8n (6MB) モデル
+    - 30+ FPS on edge devices
+    - < 30ms latency per inference
+    - TensorRT, ONNX Runtime対応
+    - CPU/GPU/EdgeTPU/Neural Engine サポート
+
+    主要コンポーネント:
+    - src/models/yolo_detector.py: 検出エンジン
+    - src/preprocessing/: 画像前処理
+    - config/: 設定管理
+    - benchmarks/: 性能計測
+
+# LLM設定（Epic分解で使用）
+llm:
+  provider: "claude"  # claude, openai, ollama, template
+  model: "claude-sonnet-4-20250514"
+  temperature: 0.3
+
+schedule:
+  start_date: "2026-02-01"
+  hours_per_day: 6
+  working_days: [0, 1, 2, 3, 4]  # 月〜金
+
+epic:
+  # id: 省略時はKEY_CONFIG準拠で自動生成 (E00001)
+  goal: "リアルタイムエッジ検出システムのv2.0リリースに向けて、性能を2倍に向上させ、新規デバイス対応を拡大する"
+  background: |
+    現在のReal-time Edge Detectionは、YOLO v8ベースでエッジデバイス向けに最適化された
+    低遅延オブジェクト検出システムである。
+
+    現状:
+    - 30+ FPS on edge devices
+    - < 30ms latency per inference
+    - YOLOv8n (6MB) モデル使用
+    - CPU/GPU/EdgeTPU/Neural Engine対応
+
+    課題:
+    - 新しいエッジデバイス（Jetson Orin, Apple M3）への対応
+    - モデルの軽量化（4MB以下）
+    - 推論速度のさらなる向上（50+ FPS目標）
+    - CI/CDパイプラインの強化
+
+  target_users: "エッジAI開発者、組み込みシステムエンジニア、IoTソリューション提供者"
+
+  success_metrics:
+    - metric: "推論速度"
+      target: "50+ FPS"
+      current: "30 FPS"
+    - metric: "モデルサイズ"
+      target: "4MB以下"
+      current: "6MB"
+    - metric: "レイテンシ"
+      target: "20ms以下"
+      current: "30ms"
+    - metric: "対応デバイス数"
+      target: "10+"
+      current: "4"
+    - metric: "テストカバレッジ"
+      target: "90%以上"
+      current: "不明"
+
+  scope:
+    in_scope:
+      - "モデル軽量化・最適化"
+      - "新規デバイス対応（Jetson Orin, Apple M3）"
+      - "TensorRT統合強化"
+      - "ベンチマークスイート拡充"
+      - "CI/CDパイプライン改善"
+      - "ドキュメント整備"
+    out_of_scope:
+      - "新しい検出アルゴリズム開発"
+      - "クラウド版の開発"
+      - "商用ライセンス対応"
+
+stakeholders:
+  epic_owner: "jinno-ai"
+  tech_lead: "nobu007"
+
+milestones:
+  - id: "M1"
+    name: "Performance Optimization"
+    due_date: "2026-02-15"
+  - id: "M2"
+    name: "New Device Support"
+    due_date: "2026-02-28"
+  - id: "M3"
+    name: "Testing & Documentation"
+    due_date: "2026-03-15"
+  - id: "M4"
+    name: "v2.0 Release"
+    due_date: "2026-03-31"
+
+decomposition:
+  max_features: 6
+  max_stories_per_feature: 5
+  story_hours_range: [2, 16]
+
+validation:
+  required_acceptance_criteria: 3
+  max_acceptance_criteria: 10  # 上限を緩和
+  max_dependency_depth: 3
+  skip_owner_check: true  # 自動生成のためオーナーチェックをスキップ
