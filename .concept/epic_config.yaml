@@ -1,4 +1,9 @@
 # realtime-edge-detection プロジェクト用設定
+# 
+# ⚠️ 重要: この設定を使用する前に
+# 1. llm.provider が "claude" になっていることを確認
+# 2. "template" を使うとテンプレート的な分解になる（価値なし）
+#
 # キー仕様: docs/KEY_SPEC.md 参照
 
 project:
@@ -27,8 +32,10 @@ project:
     - benchmarks/: 性能計測
 
 # LLM設定（Epic分解で使用）
+# ⚠️ provider: "template" は禁止（テンプレート的な分解になる）
+# ✅ provider: "claude" を使用（プロジェクト固有の具体的な分解）
 llm:
-  provider: "claude"  # claude, openai, ollama, template
+  provider: "claude"  # 本番推奨。"template" は使用禁止
   model: "claude-sonnet-4-20250514"
   temperature: 0.3
 
