@@ -1,5 +1,5 @@
 # realtime-edge-detection プロジェクト用設定
-# 
+#
 # ⚠️ 重要: この設定を使用する前に
 # 1. llm.provider が "claude" になっていることを確認
 # 2. "template" を使うとテンプレート的な分解になる（価値なし）
