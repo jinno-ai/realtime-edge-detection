@@ -1,0 +1,31 @@
+# Epic-Driven Planning - GitHub設定
+# AUTO-GENERATED from PROJECT_REGISTRY - DO NOT EDIT MANUALLY
+project:
+  name: "realtime-edge-detection"
+  provider: "github"
+
+  github:
+    owner: "jinno-ai"
+    repo: "realtime-edge-detection"
+    project_number: null
+
+  output_dir: "output"
+  charter_path: "output/charter.yml"
+
+  context: |
+    Realtime Edge Detection - エッジ検出システム
+
+llm:
+  provider: "template"
+  model: "claude-sonnet-4-20250514"
+  temperature: 0.3
+
+sync:
+  enabled: true
+  create_missing: true
+  update_existing: true
+  dry_run: false
+
+decomposition:
+  input_file: "output/decomposition.json"
+  output_dir: "output"
