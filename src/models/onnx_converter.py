@@ -97,7 +97,10 @@ class ONNXConverter:
             # Load PyTorch model
             print(f"🔧 Loading PyTorch model from {model_path}")
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            model = torch.load(model_path, map_location=device)
+            try:
+                model = torch.load(model_path, map_location=device, weights_only=False)
+            except TypeError:
+                model = torch.load(model_path, map_location=device)
 
             # Set model to evaluation mode
             model.eval()

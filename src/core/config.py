@@ -93,6 +93,9 @@ class ConfigManager:
             # Default to project config directory
             self.config_dir = Path(__file__).parent.parent.parent / 'config'
 
+        # Load configuration eagerly so the manager is usable immediately
+        self.load_config()
+
     def load_config(self) -> Dict[str, Any]:
         """
         Load and merge configuration from YAML + env vars
@@ -241,6 +244,8 @@ class ConfigManager:
 
                 return config
 
+        except EdgeDetectionError:
+            raise
         except yaml.YAMLError as e:
             # Extract line number from error if available
             error_msg = str(e)

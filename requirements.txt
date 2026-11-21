@@ -11,6 +11,12 @@ torchvision>=0.15.0
 # TensorRT (optional, for optimization)
 # tensorrt==8.6.1
 
+# ONNX
+onnx>=1.16.0
+onnxruntime>=1.17.0
+onnxscript>=0.1.0
+onnxoptimizer>=0.4.0
+
 # Utilities
 tqdm==4.66.1
 pyyaml==6.0.1

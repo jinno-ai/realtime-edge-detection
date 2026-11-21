@@ -15,13 +15,14 @@ class SecretMasker:
     # Patterns to detect sensitive data
     SENSITIVE_PATTERNS = [
         r'password["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
-        r'api_key["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
+        r'api[_\s-]?key["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
         r'api-key["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
         r'apikey["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
         r'token["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
         r'secret["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
         r'credential["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
         r'bearer\s+([a-zA-Z0-9\-._~+/]+=*)',
+        r'(sk-[a-zA-Z0-9_-]{12,})',
         r'aws_access_key_id["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
         r'aws_secret_access_key["\']?\s*[:=]\s*["\']?([^"\'\s]+)',
     ]

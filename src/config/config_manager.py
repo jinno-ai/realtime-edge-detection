@@ -5,6 +5,7 @@ Loads configuration from YAML files and environment variables.
 Supports nested configuration access with dot notation.
 """
 
+import copy
 import os
 import logging
 from pathlib import Path
@@ -66,7 +67,7 @@ class ConfigManager:
             ConfigurationError: If configuration file cannot be loaded or is invalid.
         """
         # Start with defaults
-        self._config = DEFAULT_CONFIG.copy()
+        self._config = copy.deepcopy(DEFAULT_CONFIG)
 
         # Load profile if specified
         if self._profile:
@@ -260,6 +261,28 @@ class ConfigManager:
             if default is not None:
                 logger.warning(f"Configuration key '{key}' not found, using default: {default}")
             return default
+
+    def set(self, key: str, value: Any) -> None:
+        """
+        Set configuration value using dot notation.
+
+        Args:
+            key: Dot-separated configuration key (e.g., 'model.path').
+            value: Value to set.
+
+        Raises:
+            ConfigurationError: If configuration is not loaded.
+        """
+        if not self._loaded:
+            raise ConfigurationError("Configuration not loaded. Call load() first.")
+
+        keys = key.split('.')
+        current = self._config
+        for k in keys[:-1]:
+            if k not in current or not isinstance(current[k], dict):
+                current[k] = {}
+            current = current[k]
+        current[keys[-1]] = value
 
     def get_all(self) -> Dict[str, Any]:
         """
