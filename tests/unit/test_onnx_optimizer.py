@@ -21,7 +21,20 @@ class TestONNXOptimizer:
     def sample_onnx_model(self, temp_dir):
         """Create a sample ONNX model file."""
         model_path = temp_dir / "model.onnx"
-        model_path.write_bytes(b"dummy onnx content")
+        import onnx
+        from onnx import helper, TensorProto
+        import numpy as np
+        weight = np.random.rand(3, 3).astype(np.float32)
+        init = helper.make_tensor('w', TensorProto.FLOAT, weight.shape, weight)
+        node = helper.make_node('Identity', ['x'], ['y'])
+        graph = helper.make_graph(
+            [node], 'g',
+            [helper.make_tensor_value_info('x', TensorProto.FLOAT, [1, 3])],
+            [helper.make_tensor_value_info('y', TensorProto.FLOAT, [1, 3])],
+            initializer=[init])  # unused initializer: gives passes work to do
+        model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 13)])
+        model.ir_version = 10
+        onnx.save(model, str(model_path))
         return model_path
 
     def test_optimizer_initialization(self):
@@ -73,7 +86,8 @@ class TestONNXOptimizer:
 
         # Create optimized version
         optimized_path = str(temp_dir / "optimized.onnx")
-        Path(optimized_path).write_bytes(b"x" * 512)  # Smaller than original
+        original_bytes = sample_onnx_model.read_bytes()
+        Path(optimized_path).write_bytes(original_bytes[:len(original_bytes) // 2])  # Smaller than original
 
         reduction = optimizer.get_size_reduction(
             original=str(sample_onnx_model),

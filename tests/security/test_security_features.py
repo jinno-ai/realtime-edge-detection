@@ -117,7 +117,7 @@ class TestModelVerification:
         checksums = load_model_checksums(str(checksum_file))
 
         assert 'yolov8n.pt' in checksums
-        assert checksums['yolov8n.pt'] == 'abc123'
+        assert checksums['yolov8n.pt']['sha256'] == 'abc123'
 
     def test_load_nonexistent_checksums(self, tmp_path):
         """Test loading non-existent checksum file"""
@@ -194,7 +194,8 @@ class TestSecretMasking:
 
         # Check nested masking
         assert '***' in masked['model']['api_key']
-        assert '***' in masked['database']['password']
+        assert '*' in masked['database']['password']
+        assert 'dbpass' not in masked['database']['password']
         assert masked['model']['path'] == 'yolov8n.pt'
 
     def test_mask_string_patterns(self):
@@ -389,15 +390,15 @@ class TestInputValidation:
         from src.config.validation import validate_config
 
         # Valid range
-        assert validate_config({'confidence': 0.5})
+        assert validate_config({'detection': {'confidence_threshold': 0.5}})
 
         # Invalid - too high
         with pytest.raises(ValueError):
-            validate_config({'confidence': 1.5})
+            validate_config({'detection': {'confidence_threshold': 1.5}})
 
         # Invalid - too low
         with pytest.raises(ValueError):
-            validate_config({'confidence': -0.1})
+            validate_config({'detection': {'confidence_threshold': -0.1}})
 
     def test_validate_image_path(self):
         """Test image path validation"""

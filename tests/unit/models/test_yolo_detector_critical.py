@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch, MagicMock
 import warnings
 
 from src.models.yolo_detector import YOLODetector
-from src.config.config_manager import ConfigManager
+from src.core.config import ConfigManager
 
 
 @pytest.fixture
@@ -29,15 +29,19 @@ def mock_yolo_model():
     """Create mock YOLO model with realistic results"""
     # Create mock result
     mock_result = Mock()
-    mock_box = Mock()
 
-    # Create mock tensors
+    # Per-detection box objects (real ultralytics shape)
     import torch
-    mock_box.xyxy = [torch.tensor([[100, 100, 200, 200], [300, 150, 400, 300]])]
-    mock_box.conf = [torch.tensor([0.85, 0.72])]
-    mock_box.cls = [torch.tensor([0, 1])]
+    mock_box1 = Mock()
+    mock_box1.xyxy = torch.tensor([[100, 100, 200, 200]])
+    mock_box1.conf = torch.tensor([0.85])
+    mock_box1.cls = torch.tensor([0])
+    mock_box2 = Mock()
+    mock_box2.xyxy = torch.tensor([[300, 150, 400, 300]])
+    mock_box2.conf = torch.tensor([0.72])
+    mock_box2.cls = torch.tensor([1])
 
-    mock_result.boxes = [mock_box]
+    mock_result.boxes = [mock_box1, mock_box2]
     mock_result.names = {0: "person", 1: "car", 2: "dog"}
 
     # Create mock model
@@ -253,15 +257,16 @@ class TestObjectDetection:
         """
         # GIVEN: Mock model that returns many detections
         mock_result = Mock()
-        mock_box = Mock()
 
         import torch
-        # Create 200 mock detections
-        mock_box.xyxy = [torch.tensor([[i*10, i*10, (i+1)*10, (i+1)*10] for i in range(200)])]
-        mock_box.conf = [torch.tensor([0.5] * 200)]
-        mock_box.cls = [torch.tensor([0] * 200)]
-
-        mock_result.boxes = [mock_box]
+        # Create 200 per-detection box objects (real ultralytics shape)
+        mock_result.boxes = []
+        for i in range(200):
+            b = Mock()
+            b.xyxy = torch.tensor([[i*10, i*10, (i+1)*10, (i+1)*10]])
+            b.conf = torch.tensor([0.5])
+            b.cls = torch.tensor([0])
+            mock_result.boxes.append(b)
         mock_result.names = {0: "person"}
 
         mock_model = Mock()
@@ -514,8 +519,8 @@ class TestVideoDetection:
     @patch('cv2.VideoWriter')
     @patch('cv2.VideoCapture')
     @patch('src.models.yolo_detector.YOLO')
-    def test_detect_video_with_output(self, mock_yolo_class, mock_yolo_model,
-                                      mock_video_capture, mock_video_writer, tmp_path):
+    def test_detect_video_with_output(self, mock_yolo_class, mock_video_capture,
+                                      mock_video_writer, mock_yolo_model, tmp_path):
         """
         [P0] GIVEN: Video file path and output path
         WHEN: detect_video() is called

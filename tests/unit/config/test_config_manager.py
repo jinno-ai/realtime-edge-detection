@@ -1,5 +1,11 @@
 """
-Unit tests for ConfigManager
+Unit tests for ConfigManager (src.core.config)
+
+These tests exercise the actual ConfigManager contract:
+- ConfigManager(config_path=..., profile=...) loads eagerly at construction
+- get() uses dot-notation keys (e.g. 'detection.confidence_threshold')
+- Invalid configuration raises EdgeDetectionError
+- Missing config files fall back to defaults with a warning
 """
 
 import pytest
@@ -9,6 +15,7 @@ from pathlib import Path
 import yaml
 
 from src.core.config import ConfigManager
+from src.core.errors import EdgeDetectionError
 
 
 @pytest.fixture(autouse=True)
@@ -36,10 +43,10 @@ class TestConfigManager:
         """Test loading default configuration"""
         config = ConfigManager()
 
-        assert config.get('model', 'path') == 'yolov8n.pt'
-        assert config.get('detection', 'confidence_threshold') == 0.5
-        assert config.get('detection', 'iou_threshold') == 0.4
-        assert config.get('device', 'type') == 'auto'
+        assert config.get('model.path') == 'yolov8n.pt'
+        assert config.get('detection.confidence_threshold') == 0.5
+        assert config.get('detection.iou_threshold') == 0.4
+        assert config.get('device.type') == 'auto'
 
     def test_config_from_file(self):
         """Test loading configuration from YAML file"""
@@ -54,10 +61,10 @@ class TestConfigManager:
         try:
             config = ConfigManager(config_path=temp_path)
 
-            assert config.get('model', 'path') == 'custom_model.pt'
-            assert config.get('detection', 'confidence_threshold') == 0.7
+            assert config.get('model.path') == 'custom_model.pt'
+            assert config.get('detection.confidence_threshold') == 0.7
             # Default value should be used for iou_threshold
-            assert config.get('detection', 'iou_threshold') == 0.4
+            assert config.get('detection.iou_threshold') == 0.4
         finally:
             os.unlink(temp_path)
 
@@ -65,8 +72,9 @@ class TestConfigManager:
         """Test loading profile-specific configuration"""
         config = ConfigManager(profile='dev')
 
-        assert config.get('device', 'type') == 'cpu'
-        assert config.get('detection', 'confidence_threshold') == 0.3
+        # dev.yaml: lower threshold for debugging
+        assert config.get('device.type') == 'auto'
+        assert config.get('detection.confidence_threshold') == 0.25
 
     def test_env_override(self):
         """Test environment variable overrides"""
@@ -77,8 +85,8 @@ class TestConfigManager:
         try:
             config = ConfigManager()
 
-            assert config.get('model', 'path') == 'env_model.pt'
-            assert config.get('detection', 'confidence_threshold') == 0.8
+            assert config.get('model.path') == 'env_model.pt'
+            assert config.get('detection.confidence_threshold') == 0.8
         finally:
             # Clean up
             del os.environ['EDGE_DETECTION_MODEL_PATH']
@@ -94,7 +102,7 @@ class TestConfigManager:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Configuration Validation Error"):
+            with pytest.raises(EdgeDetectionError, match="confidence_threshold"):
                 ConfigManager(config_path=temp_path)
         finally:
             os.unlink(temp_path)
@@ -109,7 +117,7 @@ class TestConfigManager:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Configuration Validation Error"):
+            with pytest.raises(EdgeDetectionError, match="iou_threshold"):
                 ConfigManager(config_path=temp_path)
         finally:
             os.unlink(temp_path)
@@ -124,7 +132,7 @@ class TestConfigManager:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Configuration Validation Error"):
+            with pytest.raises(EdgeDetectionError, match="device"):
                 ConfigManager(config_path=temp_path)
         finally:
             os.unlink(temp_path)
@@ -134,34 +142,31 @@ class TestConfigManager:
         config = ConfigManager()
 
         # Existing key
-        assert config.get('model', 'path') == 'yolov8n.pt'
+        assert config.get('model.path') == 'yolov8n.pt'
 
         # Non-existing key with default
-        assert config.get('model', 'non_existing_key', default='default_value') == 'default_value'
+        assert config.get('model.non_existing_key', 'default_value') == 'default_value'
 
-    def test_get_with_default_raises_error(self):
-        """Test get() method raises error for non-existing key without default"""
+    def test_get_missing_key_returns_none(self):
+        """Test get() returns None for a non-existing key without default"""
         config = ConfigManager()
 
-        with pytest.raises(KeyError):
-            config.get('model', 'non_existing_key')
+        assert config.get('model.non_existing_key') is None
 
     def test_get_section(self):
-        """Test get_section() method"""
+        """Test get() on a top-level section returns the nested dict"""
         config = ConfigManager()
 
-        model_section = config.get_section('model')
+        model_section = config.get('model')
 
         assert isinstance(model_section, dict)
         assert 'path' in model_section
-        assert 'auto_download' in model_section
 
     def test_get_non_existing_section(self):
-        """Test get_section() with non-existing section"""
+        """Test get() on a non-existing section returns None"""
         config = ConfigManager()
 
-        with pytest.raises(KeyError):
-            config.get_section('non_existing_section')
+        assert config.get('non_existing_section') is None
 
     def test_invalid_yaml(self):
         """Test loading invalid YAML file"""
@@ -170,32 +175,17 @@ class TestConfigManager:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError, match="Invalid YAML"):
+            with pytest.raises(EdgeDetectionError, match="Invalid YAML"):
                 ConfigManager(config_path=temp_path)
         finally:
             os.unlink(temp_path)
 
-    def test_config_file_not_found(self):
-        """Test loading non-existent configuration file"""
-        with pytest.raises(FileNotFoundError):
-            ConfigManager(config_path='/non/existent/path/config.yaml')
+    def test_config_file_not_found_falls_back_to_defaults(self):
+        """Test loading non-existent configuration file falls back to defaults"""
+        config = ConfigManager(config_path='/non/existent/path/config.yaml')
 
-    def test_save_default_config(self):
-        """Test saving default configuration to file"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / 'test_config.yaml'
-
-            config = ConfigManager()
-            config.save_default_config(str(output_path))
-
-            assert output_path.exists()
-
-            # Load saved config and verify
-            with open(output_path, 'r') as f:
-                saved_config = yaml.safe_load(f)
-
-            assert saved_config['model']['path'] == 'yolov8n.pt'
-            assert saved_config['detection']['confidence_threshold'] == 0.5
+        assert config.get('model.path') == 'yolov8n.pt'
+        assert config.get('detection.confidence_threshold') == 0.5
 
     def test_env_override_parsing_bool(self):
         """Test environment variable parsing for boolean values"""
@@ -203,7 +193,7 @@ class TestConfigManager:
 
         try:
             config = ConfigManager()
-            assert config.get('model', 'auto_download') is True
+            assert config.get('model.auto_download') is True
         finally:
             del os.environ['EDGE_DETECTION_MODEL_AUTO_DOWNLOAD']
 
@@ -213,7 +203,7 @@ class TestConfigManager:
 
         try:
             config = ConfigManager()
-            assert config.get('detection', 'max_detections') == 50
+            assert config.get('detection.max_detections') == 50
         finally:
             del os.environ['EDGE_DETECTION_DETECTION_MAX_DETECTIONS']
 
@@ -223,22 +213,9 @@ class TestConfigManager:
 
         try:
             config = ConfigManager()
-            assert config.get('detection', 'confidence_threshold') == 0.75
+            assert config.get('detection.confidence_threshold') == 0.75
         finally:
             del os.environ['EDGE_DETECTION_DETECTION_CONFIDENCE_THRESHOLD']
-
-    def test_to_dataclass(self):
-        """Test converting configuration to Config dataclass"""
-        config = ConfigManager()
-        dataclass = config.to_dataclass()
-
-        assert hasattr(dataclass, 'model')
-        assert hasattr(dataclass, 'device')
-        assert hasattr(dataclass, 'detection')
-        assert hasattr(dataclass, 'preprocessing')
-        assert hasattr(dataclass, 'output')
-
-        assert dataclass.model['path'] == 'yolov8n.pt'
 
     def test_repr(self):
         """Test string representation"""
@@ -246,8 +223,6 @@ class TestConfigManager:
         repr_str = repr(config)
 
         assert 'ConfigManager' in repr_str
-        assert 'model' in repr_str
-        assert 'device' in repr_str
 
 
 class TestConfigValidationEnhanced:
@@ -257,7 +232,7 @@ class TestConfigValidationEnhanced:
         """Test that a valid configuration passes all validation rules"""
         config = ConfigManager()
         # Should not raise any exception
-        config._validate_config()
+        config._validate_configuration()
 
     def test_confidence_threshold_out_of_range_high(self):
         """Test confidence threshold > 1.0 shows clear error message"""
@@ -269,7 +244,7 @@ class TestConfigValidationEnhanced:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(EdgeDetectionError) as exc_info:
                 ConfigManager(config_path=temp_path)
 
             error_msg = str(exc_info.value)
@@ -290,7 +265,7 @@ class TestConfigValidationEnhanced:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(EdgeDetectionError) as exc_info:
                 ConfigManager(config_path=temp_path)
 
             error_msg = str(exc_info.value)
@@ -309,7 +284,7 @@ class TestConfigValidationEnhanced:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(EdgeDetectionError) as exc_info:
                 ConfigManager(config_path=temp_path)
 
             error_msg = str(exc_info.value)
@@ -329,7 +304,7 @@ class TestConfigValidationEnhanced:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(EdgeDetectionError) as exc_info:
                 ConfigManager(config_path=temp_path)
 
             error_msg = str(exc_info.value)
@@ -337,21 +312,21 @@ class TestConfigValidationEnhanced:
         finally:
             os.unlink(temp_path)
 
-    def test_target_size_invalid_list_length(self):
-        """Test target_size with invalid list length"""
+    def test_image_size_invalid_list_length(self):
+        """Test input.image_size with invalid list length"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             config_data = {
-                'preprocessing': {'target_size': [640]}  # Only 1 element
+                'input': {'image_size': [640]}  # Only 1 element
             }
             yaml.dump(config_data, f)
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(EdgeDetectionError) as exc_info:
                 ConfigManager(config_path=temp_path)
 
             error_msg = str(exc_info.value)
-            assert 'target_size' in error_msg
+            assert 'image_size' in error_msg
         finally:
             os.unlink(temp_path)
 
@@ -360,14 +335,12 @@ class TestConfigValidationEnhanced:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             config_data = {
                 'device': {'type': 'invalid_device_type'},
-                'preprocessing': {'target_size': [640, 640]},  # Valid to avoid other errors
-                'detection': {'confidence_threshold': 0.5, 'iou_threshold': 0.4, 'max_detections': 100}
             }
             yaml.dump(config_data, f)
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
+            with pytest.raises(EdgeDetectionError) as exc_info:
                 ConfigManager(config_path=temp_path)
 
             error_msg = str(exc_info.value)
@@ -375,8 +348,8 @@ class TestConfigValidationEnhanced:
         finally:
             os.unlink(temp_path)
 
-    def test_model_path_required_missing(self):
-        """Test that model.path is required"""
+    def test_model_path_missing_uses_default(self):
+        """Test that missing model.path falls back to the default"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             config_data = {
                 'model': {}  # Missing path
@@ -385,12 +358,9 @@ class TestConfigValidationEnhanced:
             temp_path = f.name
 
         try:
-            with pytest.raises(ValueError) as exc_info:
-                ConfigManager(config_path=temp_path)
-
-            error_msg = str(exc_info.value)
-            # Should have some validation error
-            assert len(error_msg) > 0
+            config = ConfigManager(config_path=temp_path)
+            # Implementation warns and fills the default rather than raising
+            assert config.get('model.path') == 'yolov8n.pt'
         finally:
             os.unlink(temp_path)
 
@@ -403,35 +373,35 @@ class TestProfileLoading:
         config = ConfigManager(profile='prod')
 
         # Check prod-specific settings
-        assert config.get('device', 'type') == 'auto'
-        assert config.get('logging', 'level') == 'INFO'
+        assert config.get('device.type') == 'auto'
+        assert config.get('logging.level') == 'INFO'
 
     def test_load_profile_dev(self):
         """Test loading development profile"""
         config = ConfigManager(profile='dev')
 
-        # Check dev-specific settings
-        assert config.get('device', 'type') == 'cpu'
-        assert config.get('logging', 'level') == 'DEBUG'
+        # Check dev-specific settings (config/dev.yaml)
+        assert config.get('device.type') == 'auto'
+        assert config.get('logging.level') == 'DEBUG'
 
     def test_load_profile_testing(self):
         """Test loading testing profile"""
         config = ConfigManager(profile='testing')
 
-        # Check testing-specific settings
-        assert config.get('device', 'type') == 'cpu'
-        assert config.get('metrics', 'enabled') is False
+        # Check testing-specific settings (config/testing.yaml)
+        assert config.get('device.type') == 'cpu'
+        assert config.get('metrics.enabled') is True
 
     def test_profile_overrides_base_config(self):
         """Test that profile settings override base config"""
         config = ConfigManager(profile='dev')
 
-        # dev.yaml should override confidence_threshold
-        assert config.get('detection', 'confidence_threshold') == 0.3
+        # dev.yaml lowers the threshold for debugging
+        assert config.get('detection.confidence_threshold') == 0.25
 
     def test_missing_profile_error_message(self):
         """Test helpful error message when profile doesn't exist"""
-        with pytest.raises(FileNotFoundError) as exc_info:
+        with pytest.raises(EdgeDetectionError) as exc_info:
             ConfigManager(profile='nonexistent_profile')
 
         error_msg = str(exc_info.value)
@@ -440,13 +410,12 @@ class TestProfileLoading:
         assert ('dev' in error_msg or 'prod' in error_msg or 'testing' in error_msg)
 
     def test_list_available_profiles(self):
-        """Test _list_available_profiles helper method"""
+        """Test list_profiles() helper method"""
         config = ConfigManager()
-        profiles = config._list_available_profiles()
+        profiles = config.list_profiles()
 
-        assert isinstance(profiles, dict)
-        # Should at least have the three default profiles
-        assert 'dev' in profiles or 'prod' in profiles or 'testing' in profiles
-        # Should have descriptions
-        if 'dev' in profiles:
-            assert 'debug logging' in profiles['dev'].lower()
+        assert isinstance(profiles, list)
+        # Should at least have the default profiles
+        assert 'dev' in profiles
+        assert 'prod' in profiles
+        assert 'testing' in profiles

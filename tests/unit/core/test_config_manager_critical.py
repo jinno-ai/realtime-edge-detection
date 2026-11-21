@@ -114,12 +114,9 @@ class TestConfigLoadingCriticalPaths:
         with open(config_file, 'w') as f:
             f.write("model:\n  type: yolo_v8\n    path: bad  # Invalid indentation")
 
-        # WHEN: Loading invalid YAML
-        config_mgr = ConfigManager(config_path=str(config_file))
-
-        # THEN: Raises error with clear message
+        # WHEN/THEN: Loading invalid YAML raises at construction (eager load)
         with pytest.raises(EdgeDetectionError) as exc_info:
-            config_mgr.load_config()
+            ConfigManager(config_path=str(config_file))
 
         error = exc_info.value
         assert error.code == ErrorCode.INVALID_CONFIG
@@ -140,12 +137,9 @@ class TestConfigLoadingCriticalPaths:
         with open(config_file, 'w') as f:
             yaml.dump(['item1', 'item2'], f)
 
-        # WHEN: Loading non-dict YAML
-        config_mgr = ConfigManager(config_path=str(config_file))
-
-        # THEN: Raises error
+        # WHEN/THEN: Loading non-dict YAML raises at construction (eager load)
         with pytest.raises(EdgeDetectionError) as exc_info:
-            config_mgr.load_config()
+            ConfigManager(config_path=str(config_file))
 
         error = exc_info.value
         assert error.code == ErrorCode.INVALID_CONFIG
@@ -474,13 +468,9 @@ class TestProfileLoading:
         (tmp_path / "dev.yaml").touch()
         (tmp_path / "testing.yaml").touch()
 
-        # WHEN: Loading non-existent profile
-        config_mgr = ConfigManager(profile='nonexistent')
-        config_mgr.config_dir = tmp_path
-
-        # THEN: Raises error with helpful message
+        # WHEN/THEN: Loading non-existent profile raises at construction
         with pytest.raises(EdgeDetectionError) as exc_info:
-            config_mgr.load_config()
+            ConfigManager(config_path=str(tmp_path / "dev.yaml"), profile='nonexistent')
 
         error = exc_info.value
         assert error.code == ErrorCode.INVALID_CONFIG

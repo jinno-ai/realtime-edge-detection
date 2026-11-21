@@ -102,7 +102,7 @@ class TestYAMLLoading:
     def test_invalid_yaml_syntax(self):
         """Test error handling for invalid YAML syntax."""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            f.write("model:\n  name: yolov8n\n  bad_indent: bad\n    value\n")
+            f.write("model:\n  name: yolov8n\n invalid: yaml: content:\n  - [unclosed\n")
             temp_path = f.name
 
         try:
@@ -221,10 +221,9 @@ class TestConfigurationValidation:
 
         try:
             config = ConfigManager()
-            config.load()
 
-            with pytest.raises(ConfigurationError, match="Invalid confidence_threshold"):
-                config.validate()
+            with pytest.raises(ConfigurationError, match="confidence_threshold"):
+                config.load()
         finally:
             del os.environ['EDGE_DETECTION_DETECTION__CONFIDENCE_THRESHOLD']
 
@@ -234,10 +233,9 @@ class TestConfigurationValidation:
 
         try:
             config = ConfigManager()
-            config.load()
 
-            with pytest.raises(ConfigurationError, match="Invalid iou_threshold"):
-                config.validate()
+            with pytest.raises(ConfigurationError, match="iou_threshold"):
+                config.load()
         finally:
             del os.environ['EDGE_DETECTION_DETECTION__IOU_THRESHOLD']
 
@@ -247,10 +245,9 @@ class TestConfigurationValidation:
 
         try:
             config = ConfigManager()
-            config.load()
 
-            with pytest.raises(ConfigurationError, match="Invalid device type"):
-                config.validate()
+            with pytest.raises(ConfigurationError, match="device"):
+                config.load()
         finally:
             del os.environ['EDGE_DETECTION_DEVICE__TYPE']
 

@@ -307,7 +307,7 @@ device:
     - cpu
 
 output:
-  format: json
+  format: jpg
   save_visual: true
 """)
         return str(config)

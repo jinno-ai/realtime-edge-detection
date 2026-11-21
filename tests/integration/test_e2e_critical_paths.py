@@ -68,7 +68,8 @@ class TestConfigurationE2E:
         # WHEN: Loading config with all sources
         config_mgr = ConfigManager(
             config_path=str(user_file),
-            default_config=str(default_file)
+            default_config=str(default_file),
+            profile='prod'
         )
         config_mgr.config_dir = tmp_path
         config = config_mgr.load_config()
@@ -100,19 +101,17 @@ class TestConfigurationE2E:
         with open(config_file, 'w') as f:
             yaml.dump(invalid_config, f)
 
-        # WHEN: Loading config
-        config_mgr = ConfigManager(config_path=str(config_file))
-        config = config_mgr.load_config()
+        # WHEN/THEN: Loading raises a validation error eagerly
+        from src.core.errors import EdgeDetectionError
+        with pytest.raises(EdgeDetectionError) as exc_info:
+            ConfigManager(config_path=str(config_file))
+        assert 'confidence_threshold' in str(exc_info.value)
 
-        # THEN: Validation fails with errors
-        is_valid = config_mgr.validate()
-        assert is_valid is False
-
-        errors = config_mgr.get_validation_errors()
+        # AND: The validator reports all invalid fields
+        from src.core.validators import ConfigValidator
+        errors = ConfigValidator().validate(invalid_config)
         assert len(errors) >= 2
-
-        # AND: Errors include hints
-        error_messages = ' '.join(errors)
+        error_messages = ' '.join(e.parameter for e in errors)
         assert 'confidence_threshold' in error_messages
         assert 'iou_threshold' in error_messages
 
@@ -187,9 +186,9 @@ class TestDetectionPipelineE2E:
         mock_result = Mock()
         mock_box = Mock()
         import torch
-        mock_box.xyxy = [torch.tensor([[100, 100, 200, 200]])]
-        mock_box.conf = [torch.tensor([0.85])]
-        mock_box.cls = [torch.tensor([0])]
+        mock_box.xyxy = torch.tensor([[100, 100, 200, 200]], dtype=torch.float32)
+        mock_box.conf = torch.tensor([0.85])
+        mock_box.cls = torch.tensor([0])
         mock_result.boxes = [mock_box]
         mock_result.names = {0: "person"}
 
@@ -276,16 +275,21 @@ class TestDetectionPipelineE2E:
         mock_result = Mock()
         mock_box = Mock()
         import torch
-        # Return 20 detections
-        mock_box.xyxy = [torch.tensor([[i * 10, i * 10, (i + 1) * 10, (i + 1) * 10]
-                                      for i in range(20)])]
-        mock_box.conf = [torch.tensor([0.9] * 20)]
-        mock_box.cls = [torch.tensor([0] * 20)]
-        mock_result.boxes = [mock_box]
+        # Return 20 detections (one box object per detection)
+        mock_result.boxes = []
+        for i in range(20):
+            b = Mock()
+            b.xyxy = torch.tensor(
+                [[i * 10, i * 10, (i + 1) * 10, (i + 1) * 10]],
+                dtype=torch.float32)
+            b.conf = torch.tensor([0.9])
+            b.cls = torch.tensor([0])
+            mock_result.boxes.append(b)
         mock_result.names = {0: "person"}
 
         mock_model = Mock()
         mock_model.return_value = [mock_result]
+        mock_model.names = {0: "person"}
         mock_yolo_class.return_value = mock_model
 
         # WHEN: Detecting
@@ -443,13 +447,10 @@ class TestErrorRecoveryE2E:
         invalid_file = tmp_path / "invalid.yaml"
         invalid_file.write_text("model:\n  type: yolo_v8\n    path: bad  # Bad indent")
 
-        # WHEN: Loading
-        config_mgr = ConfigManager(config_path=str(invalid_file))
-
-        # THEN: Raises clear error
+        # WHEN/THEN: Loading raises clear error (construction is eager)
         from src.core.errors import EdgeDetectionError
         with pytest.raises(EdgeDetectionError) as exc_info:
-            config_mgr.load_config()
+            ConfigManager(config_path=str(invalid_file))
 
         error = exc_info.value
         assert 'Invalid YAML syntax' in str(error)
@@ -517,8 +518,9 @@ class TestImagePreprocessingE2E:
         assert padded.shape == (640, 640, 3)
         assert scale > 0
         assert len(padding) == 2
-        assert isinstance(padding[0], tuple)  # (top, bottom) padding
-        assert isinstance(padding[1], tuple)  # (left, right) padding
+        pad_w, pad_h = padding
+        assert pad_w == 0     # 640x640 target: no horizontal padding
+        assert pad_h == 80    # 480 -> 640: 80px vertical padding
 
     @pytest.mark.integration
     def test_batch_preprocessing_workflow(self):

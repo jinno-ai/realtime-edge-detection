@@ -63,9 +63,9 @@ def mock_yolo_result():
 
     # Mock tensor values
     import torch
-    mock_box.xyxy = [torch.tensor([[100, 100, 200, 200]])]
-    mock_box.conf = [torch.tensor([0.85])]
-    mock_box.cls = [torch.tensor([0])]
+    mock_box.xyxy = torch.tensor([[100, 100, 200, 200]])
+    mock_box.conf = torch.tensor([0.85])
+    mock_box.cls = torch.tensor([0])
 
     mock_result.boxes = [mock_box]
     mock_result.names = {0: "person", 1: "car", 2: "dog"}

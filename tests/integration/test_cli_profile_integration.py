@@ -82,14 +82,12 @@ device:
         from src.core.config import ConfigManager
         from src.core.errors import EdgeDetectionError
 
-        cm = ConfigManager(
-            default_config=str(default_config),
-            profile="nonexistent"
-        )
-
-        # Should raise error with helpful message
+        # Should raise error with helpful message (validation is eager)
         with pytest.raises(EdgeDetectionError) as exc_info:
-            cm.load_config()
+            ConfigManager(
+                default_config=str(default_config),
+                profile="nonexistent"
+            )
 
         error_msg = str(exc_info.value)
         assert "not found" in error_msg.lower()

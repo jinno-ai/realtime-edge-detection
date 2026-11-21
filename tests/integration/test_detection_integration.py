@@ -9,24 +9,6 @@ import numpy as np
 from unittest.mock import Mock, patch
 
 
-@pytest.fixture
-def mock_yolo_model():
-    """Mock YOLO model for testing"""
-    mock_result = Mock()
-    mock_box = Mock()
-    mock_box.xyxy = [np.array([[100, 100, 200, 200]])]
-    mock_box.conf = [np.tensor([0.85])]
-    mock_box.cls = [np.tensor([0])]
-    mock_result.boxes = [mock_box]
-    mock_result.names = {0: "person"}
-
-    mock_model = Mock()
-    mock_model.return_value = [mock_result]
-    mock_model.names = {0: "person", 1: "car", 2: "dog"}
-
-    return mock_model
-
-
 @pytest.mark.integration
 @patch('src.models.yolo_detector.YOLO')
 def test_full_detection_pipeline(mock_yolo_class, mock_yolo_model):
@@ -198,13 +180,15 @@ def test_batch_detection(mock_yolo_class, mock_yolo_model):
 @pytest.mark.integration
 def test_video_utils():
     """Test video processing utilities"""
-    from src.utils.video_utils import VideoProcessor
+    from src.utils.video_utils import FrameProcessor, VideoCapture
 
-    processor = VideoProcessor()
+    # FrameProcessor wraps a detector callable for video processing
+    detector = Mock()
+    processor = FrameProcessor(detector=detector, display=False)
+    assert processor.detector is detector
+    assert processor.writer is None
 
-    # Test with mock video properties
-    fps = 30
-    frame_count = 300
-    duration = processor.calculate_duration(fps, frame_count)
-
-    assert duration == 10.0  # 300 frames / 30 fps
+    # VideoCapture exposes target_fps configuration
+    cap = VideoCapture(source=0, buffer_size=2, fps=30)
+    assert cap.target_fps == 30
+    assert cap.running is False

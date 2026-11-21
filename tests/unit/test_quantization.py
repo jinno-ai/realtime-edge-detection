@@ -25,7 +25,7 @@ class MockModel(nn.Module):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 16, 3)
         self.conv2 = nn.Conv2d(16, 32, 3)
-        self.fc = nn.Linear(32 * 636 * 636, 80)  # Simplified
+        self.fc = nn.Linear(32 * 6 * 6, 80)
     
     def forward(self, x):
         x = self.conv1(x)

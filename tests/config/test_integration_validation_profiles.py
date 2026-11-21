@@ -3,6 +3,7 @@ Integration tests for validation and profile functionality.
 """
 
 import pytest
+import yaml
 import tempfile
 import shutil
 from pathlib import Path
@@ -32,21 +33,18 @@ class TestValidationIntegration:
         assert config.get('model.name') == 'yolov8n'
         assert config.get('detection.confidence_threshold') == 0.25
 
-    def test_skip_validation_allows_invalid_values(self):
+    def test_skip_validation_allows_invalid_values(self, tmp_path):
         """Test skip_validation parameter allows loading without validation."""
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.dump({
+            'detection': {'confidence_threshold': 1.5}  # Would fail validation
+        }))
+
         config = ConfigManager()
-        config._config = {
-            'model': {'name': 'yolov8n', 'path': None, 'cache_dir': '~/.cache/edge-detection/models'},
-            'device': {'type': 'auto', 'auto_detect': True},
-            'detection': {'confidence_threshold': 1.5, 'iou_threshold': 0.45, 'max_detections': 300},
-            'input': {'image_size': [640, 640], 'letterbox': True, 'normalize': True},
-            'output': {'save_dir': './output', 'format': 'jpg', 'show_confidence': True, 'show_labels': True},
-            'logging': {'level': 'INFO', 'format': 'text', 'file': None},
-            'performance': {'half_precision': False, 'batch_size': 1, 'workers': 4}
-        }
-        config._loaded = True
         # Should not raise with skip_validation
-        config.validate()  # This will raise due to 1.5 threshold
+        config.load(str(config_file), skip_validation=True)
+
+        assert config.get('detection.confidence_threshold') == 1.5
 
 
 class TestProfileIntegration:
