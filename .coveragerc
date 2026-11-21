@@ -1,5 +1,7 @@
-[coverage]
-# Coverage configuration
+[run]
+# Store relative paths so the .coverage data file is portable across
+# machines (required by py-cov-action/python-coverage-comment-action).
+relative_files = true
 
 # Include these paths in coverage measurement
 source =
