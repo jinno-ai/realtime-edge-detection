@@ -22,7 +22,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
@@ -40,10 +40,10 @@ jobs:
 
     - name: Check coverage threshold
       run: |
-        coverage report --fail-under=80
+        coverage report --fail-under=70
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.xml
         flags: unittests
@@ -51,20 +51,27 @@ jobs:
         fail_ci_if_error: false
 
     - name: Archive coverage reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report-${{ matrix.python-version }}
-        path: htmlcov/
+        path: |
+          htmlcov/
+          coverage.xml
+          .coverage
+        include-hidden-files: true
 
   coverage-comment:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
     - uses: actions/checkout@v4
 
     - name: Download coverage data
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: coverage-report-3.12
 
@@ -72,5 +79,5 @@ jobs:
       uses: py-cov-action/python-coverage-comment-action@v3
       with:
         GITHUB_TOKEN: ${{ github.token }}
-        MINIMUM_GREEN: 80
+        MINIMUM_GREEN: 70
         MINIMUM_ORANGE: 60

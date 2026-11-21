@@ -195,7 +195,12 @@ class QuantizationPipeline:
         representative data.
         """
         print("   Applying dynamic INT8 quantization...")
-        
+
+        # Select an available quantized engine (fbgemm on x86, qnnpack on ARM)
+        engines = torch.backends.quantized.supported_engines
+        preferred = 'fbgemm' if 'fbgemm' in engines else engines[0]
+        torch.backends.quantized.engine = preferred
+
         # Dynamic quantization for linear and convolutional layers
         model_int8 = torch.quantization.quantize_dynamic(
             model,

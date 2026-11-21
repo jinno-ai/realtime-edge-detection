@@ -136,12 +136,11 @@ class TestDeviceInfo:
 
     def test_get_cuda_device_info(self, device_manager):
         """Test getting CUDA device information."""
-        with patch('src.device.device_manager.torch') as mock_torch:
-            mock_torch.cuda.is_available.return_value = True
-            mock_torch.cuda.device_count.return_value = 2
-            mock_torch.cuda.current_device.return_value = 0
-            mock_torch.cuda.get_device_name.return_value = "NVIDIA GeForce RTX 3080"
-
+        with patch.object(device_manager, '_check_cuda', return_value=True), \
+             patch('torch.cuda.is_available', return_value=True), \
+             patch('torch.cuda.device_count', return_value=2), \
+             patch('torch.cuda.current_device', return_value=0), \
+             patch('torch.cuda.get_device_name', return_value="NVIDIA GeForce RTX 3080"):
             info = device_manager.get_device_info(DeviceType.CUDA)
 
             assert info["type"] == "cuda"
@@ -151,15 +150,13 @@ class TestDeviceInfo:
 
     def test_list_available_devices(self, device_manager):
         """Test listing available devices."""
-        with patch.object(device_manager, '_check_cuda', return_value=True):
-            with patch('src.device.device_manager.torch') as mock_torch:
-                mock_torch.cuda.is_available.return_value = True
-                mock_torch.cuda.device_count.return_value = 1
+        with patch.object(device_manager, '_check_cuda', return_value=True), \
+             patch('torch.cuda.is_available', return_value=True), \
+             patch('torch.cuda.device_count', return_value=1):
+            devices_str = device_manager.list_available_devices()
 
-                devices_str = device_manager.list_available_devices()
-
-                assert "Available devices:" in devices_str
-                assert "cuda" in devices_str.lower()
+            assert "Available devices:" in devices_str
+            assert "cuda" in devices_str.lower()
 
 
 class TestTorchDevice:
@@ -175,16 +172,14 @@ class TestTorchDevice:
 
     def test_get_torch_device_cuda(self, device_manager):
         """Test getting PyTorch CUDA device."""
-        import torch
+        torch_device = device_manager.get_torch_device(DeviceType.CUDA)
 
-        with patch('src.device.device_manager.torch', torch):
-            torch_device = device_manager.get_torch_device(DeviceType.CUDA)
-
-            assert torch_device.type == "cuda"
+        assert torch_device.type == "cuda"
 
     def test_get_torch_device_without_pytorch(self, device_manager):
         """Test that ImportError is raised when PyTorch unavailable."""
-        with patch('src.device.device_manager.torch', None):
+        import sys
+        with patch.dict(sys.modules, {'torch': None}):
             with pytest.raises(ImportError):
                 device_manager.get_torch_device(DeviceType.CPU)
 

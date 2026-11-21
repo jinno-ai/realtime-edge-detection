@@ -110,7 +110,7 @@ class TestFileSystemOperations:
         """Test loading config from custom path specified as argument."""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             yaml.dump({
-                'model': {'name': 'custom_model'},
+                'model': {'name': 'yolov8m'},
                 'device': {'type': 'cpu'}
             }, f)
             custom_path = f.name
@@ -119,7 +119,7 @@ class TestFileSystemOperations:
             config = ConfigManager()
             config.load(custom_path)
 
-            assert config.get('model.name') == 'custom_model'
+            assert config.get('model.name') == 'yolov8m'
             assert config.get('device.type') == 'cpu'
         finally:
             os.unlink(custom_path)

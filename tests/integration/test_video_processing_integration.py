@@ -24,9 +24,9 @@ class TestVideoProcessingPipeline:
         mock_result = Mock()
         mock_box = Mock()
         import torch
-        mock_box.xyxy = [torch.tensor([[100, 100, 200, 200]])]
-        mock_box.conf = [torch.tensor([0.85])]
-        mock_box.cls = [torch.tensor([0])]
+        mock_box.xyxy = torch.tensor([[100, 100, 200, 200]], dtype=torch.float32)
+        mock_box.conf = torch.tensor([0.85])
+        mock_box.cls = torch.tensor([0])
         mock_result.boxes = [mock_box]
         mock_result.names = {0: "person"}
 

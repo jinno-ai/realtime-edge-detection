@@ -63,6 +63,7 @@ def run_benchmark_tests(
         '-v' if verbose else '',
         '--tb=short',
         '--strict-markers',
+        '--no-cov',
     ]
 
     if smoke_only:

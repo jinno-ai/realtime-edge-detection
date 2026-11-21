@@ -1,5 +1,7 @@
-[coverage]
-# Coverage configuration
+[run]
+# Store relative paths so the .coverage data file is portable across
+# machines (required by py-cov-action/python-coverage-comment-action).
+relative_files = true
 
 # Include these paths in coverage measurement
 source =
@@ -14,6 +16,11 @@ omit =
     */dist/*
     setup.py
     */migrations/*
+
+[report]
+# Report configuration
+# Threshold is enforced in CI (.github/workflows/test.yml) so that
+# marker-scoped pytest runs (e.g. -m smoke) do not fail on coverage.
 
 # Coverage precision
 precision = 2
@@ -35,11 +42,6 @@ exclude_lines =
     # Additional exclusions
     class .*\bProtocol\):
     @[a-z_]*protocol
-
-[report]
-# Report configuration
-# Fail if total coverage is below 80%
-fail_under = 80.0
 
 # Show missing lines
 show_missing = True

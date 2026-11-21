@@ -37,20 +37,19 @@ def create_detector(ctx, model, confidence, iou, device):
     """
     try:
         # Load configuration
-        config_mgr = ConfigManager(
-            config_path=ctx.obj.get('config'),
-            profile=ctx.obj.get('profile')
-        )
+        config_mgr = ConfigManager(profile=ctx.obj.get('profile'))
+        config_path = ctx.obj.get('config')
+        config_mgr.load(str(config_path) if config_path else None)
 
         # Apply CLI overrides
         if model:
-            config_mgr.config['model']['path'] = model
+            config_mgr.set('model.path', model)
         if confidence is not None:
-            config_mgr.config['detection']['confidence_threshold'] = confidence
+            config_mgr.set('detection.confidence_threshold', confidence)
         if iou is not None:
-            config_mgr.config['detection']['iou_threshold'] = iou
+            config_mgr.set('detection.iou_threshold', iou)
         if device:
-            config_mgr.config['device']['type'] = device
+            config_mgr.set('device.type', device)
 
         # Validate configuration
         config_mgr.validate()
@@ -476,7 +475,8 @@ def handle_config_command(action: str, config: Optional[str]) -> None:
             raise SystemExit(1)
 
         try:
-            config_mgr = ConfigManager(config_path=Path(config))
+            config_mgr = ConfigManager()
+            config_mgr.load(str(config))
             config_mgr.validate()
             click.echo(f"✓ Configuration file is valid: {config}")
         except Exception as e:
@@ -484,7 +484,8 @@ def handle_config_command(action: str, config: Optional[str]) -> None:
             raise SystemExit(1)
 
     elif action == 'show':
-        config_mgr = ConfigManager(config_path=Path(config) if config else None)
+        config_mgr = ConfigManager()
+        config_mgr.load(str(config) if config else None)
         click.echo("\nCurrent Configuration:")
         click.echo(f"  Model: {config_mgr.get('model.path')}")
         click.echo(f"  Device: {config_mgr.get('device.type')}")

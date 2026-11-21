@@ -9,6 +9,17 @@ from typing import Dict, Any, Optional
 import time
 
 
+def _load_optimizer():
+    """Import graph optimizer: standalone onnxoptimizer, or onnx.optimizer on old onnx."""
+    try:
+        import onnxoptimizer
+        return onnxoptimizer
+    except ImportError:
+        from onnx import optimizer
+        return optimizer
+
+
+
 class ONNXOptimizer:
     """
     Optimizes ONNX models using graph transformations.
@@ -64,7 +75,7 @@ class ONNXOptimizer:
         """
         try:
             import onnx
-            from onnx import optimizer
+            optimizer = _load_optimizer()
 
             # Load model
             print(f"🔧 Loading ONNX model from {model_path}")
@@ -132,7 +143,7 @@ class ONNXOptimizer:
         """
         try:
             import onnx
-            from onnx import optimizer
+            optimizer = _load_optimizer()
 
             model = onnx.load(model_path)
 
@@ -159,7 +170,7 @@ class ONNXOptimizer:
         """
         try:
             import onnx
-            from onnx import optimizer
+            optimizer = _load_optimizer()
 
             model = onnx.load(model_path)
 
@@ -191,7 +202,7 @@ class ONNXOptimizer:
         """
         try:
             import onnx
-            from onnx import optimizer
+            optimizer = _load_optimizer()
 
             model = onnx.load(model_path)
 

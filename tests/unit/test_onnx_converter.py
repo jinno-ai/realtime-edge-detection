@@ -21,10 +21,16 @@ class TestONNXConverter:
     @pytest.fixture
     def sample_pytorch_model_path(self, tmp_path):
         """Create a sample PyTorch model file for testing."""
-        # This would normally be a real .pt file
-        # For testing, we'll mock the model loading
+        import torch
+        model = torch.nn.Sequential(
+            torch.nn.Conv2d(3, 4, 3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.AdaptiveAvgPool2d(1),
+            torch.nn.Flatten(),
+            torch.nn.Linear(4, 10),
+        )
         model_path = tmp_path / "test_model.pt"
-        model_path.touch()
+        torch.save(model, model_path)
         return model_path
 
     def test_converter_initialization(self, temp_output_dir):

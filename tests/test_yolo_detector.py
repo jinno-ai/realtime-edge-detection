@@ -64,9 +64,9 @@ def test_detect_single_image():
     # Mock YOLO model
     mock_result = Mock()
     mock_box = Mock()
-    mock_box.xyxy = [torch.tensor([[100, 100, 200, 200]])]
-    mock_box.conf = [torch.tensor([0.85])]
-    mock_box.cls = [torch.tensor([0])]
+    mock_box.xyxy = torch.tensor([[100, 100, 200, 200]])
+    mock_box.conf = torch.tensor([0.85])
+    mock_box.cls = torch.tensor([0])
     mock_result.boxes = [mock_box]
     mock_result.names = {0: "person"}
 
@@ -86,7 +86,7 @@ def test_detect_single_image():
         assert 'confidence' in detections[0]
         assert 'class_id' in detections[0]
         assert 'class_name' in detections[0]
-        assert detections[0]['confidence'] == 0.85
+        assert detections[0]['confidence'] == pytest.approx(0.85)
         assert detections[0]['class_name'] == "person"
 
 
@@ -141,9 +141,9 @@ def test_confidence_threshold_filtering():
 
     mock_result = Mock()
     mock_box = Mock()
-    mock_box.xyxy = [torch.tensor([[100, 100, 200, 200]])]
-    mock_box.conf = [torch.tensor([0.65])]  # Below threshold
-    mock_box.cls = [torch.tensor([0])]
+    mock_box.xyxy = torch.tensor([[100, 100, 200, 200]])
+    mock_box.conf = torch.tensor([0.65])  # Below threshold
+    mock_box.cls = torch.tensor([0])
     mock_result.boxes = [mock_box]
     mock_result.names = {0: "person"}
 

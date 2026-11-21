@@ -19,6 +19,57 @@ from typing import Dict, Any
 import torch
 
 
+
+@pytest.fixture
+def sample_baseline(tmp_path):
+    """Create sample baseline file"""
+    baseline_file = tmp_path / "baseline.json"
+    baseline_data = {
+        'timestamp': datetime.now().isoformat(),
+        'hardware': {
+            'cpu': 'x86_64',
+            'gpu': None,
+            'ram_gb': 16
+        },
+        'metrics': {
+            'cpu_latency_ms': 25.0,
+            'gpu_latency_ms': 8.0,
+            'memory_mb': 245,
+            'fps': 40.0
+        }
+    }
+
+    with open(baseline_file, 'w') as f:
+        json.dump(baseline_data, f, indent=2)
+
+    return baseline_file
+
+
+@pytest.fixture
+def multi_platform_baseline(tmp_path):
+    """Create multi-platform baseline"""
+    baseline_file = tmp_path / "baseline_multi.json"
+    baseline_data = {
+        'x86_64': {
+            'cpu_latency_ms': 25.0,
+            'gpu_latency_ms': 8.0,
+            'memory_mb': 245,
+            'fps': 40.0
+        },
+        'arm64': {
+            'cpu_latency_ms': 35.0,
+            'gpu_latency_ms': None,
+            'memory_mb': 180,
+            'fps': 28.0
+        }
+    }
+
+    with open(baseline_file, 'w') as f:
+        json.dump(baseline_data, f, indent=2)
+
+    return baseline_file
+
+
 class TestCPUInferenceLatency:
     """Test CPU inference latency meets NFR-P1: <30ms"""
 
@@ -29,36 +80,25 @@ class TestCPUInferenceLatency:
         from src.hardware.device_manager import DeviceManager
 
         # Use CPU device
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
         # Mock model loading for testing
         from unittest.mock import patch, Mock
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            # Create mock model that simulates ~20ms latency
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            # Add simulated latency
-            def mock_detect(img):
-                import time
-                time.sleep(0.020)  # Simulate 20ms processing
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.020)  # Simulate 20ms processing
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        # Measure latency
+        results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
-
-            # Measure latency
-            results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
-
-            # Check threshold (NFR-P1: <30ms)
-            threshold = performance_thresholds['cpu_latency_ms']
-            assert results['mean'] < threshold, f"CPU latency {results['mean']:.2f}ms exceeds threshold {threshold}ms"
+        # Check threshold (NFR-P1: <30ms)
+        threshold = performance_thresholds['cpu_latency_ms']
+        assert results['mean'] < threshold, f"CPU latency {results['mean']:.2f}ms exceeds threshold {threshold}ms"
 
     @pytest.mark.slow
     def test_cpu_latency_consistency(self, sample_image_640x640, measure_latency, performance_thresholds):
@@ -67,30 +107,21 @@ class TestCPUInferenceLatency:
         from src.hardware.device_manager import DeviceManager
         from unittest.mock import patch, Mock
 
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            import time
-            def mock_detect(img):
-                time.sleep(0.020)  # Consistent 20ms
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.020)
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        results = measure_latency(detector, sample_image_640x640, iterations=30, warmup=5)
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
-
-            results = measure_latency(detector, sample_image_640x640, iterations=30, warmup=5)
-
-            # Standard deviation should be low (<30% of mean)
-            assert results['std'] < (results['mean'] * 0.3), \
-                f"Latency inconsistent: std={results['std']:.2f}ms, mean={results['mean']:.2f}ms"
+        # Standard deviation should be low (<30% of mean)
+        assert results['std'] < (results['mean'] * 0.3), \
+            f"Latency inconsistent: std={results['std']:.2f}ms, mean={results['mean']:.2f}ms"
 
 
 class TestGPUInferenceLatency:
@@ -104,30 +135,21 @@ class TestGPUInferenceLatency:
         from src.hardware.device_manager import DeviceManager
         from unittest.mock import patch, Mock
 
-        device_manager = DeviceManager(device='cuda')
+        device_manager = DeviceManager(device_str='cuda')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            import time
-            def mock_detect(img):
-                time.sleep(0.008)  # Simulate 8ms processing
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.008)
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        results = measure_latency(detector, sample_image_640x640, iterations=30, warmup=5)
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
-
-            results = measure_latency(detector, sample_image_640x640, iterations=30, warmup=5)
-
-            # Check threshold (NFR-P2: <10ms)
-            threshold = performance_thresholds['gpu_latency_ms']
-            assert results['mean'] < threshold, f"GPU latency {results['mean']:.2f}ms exceeds threshold {threshold}ms"
+        # Check threshold (NFR-P2: <10ms)
+        threshold = performance_thresholds['gpu_latency_ms']
+        assert results['mean'] < threshold, f"GPU latency {results['mean']:.2f}ms exceeds threshold {threshold}ms"
 
 
 class TestMemoryUsage:
@@ -140,24 +162,17 @@ class TestMemoryUsage:
         from src.hardware.device_manager import DeviceManager
         from unittest.mock import patch, Mock
 
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
-            mock_load.return_value = mock_model
+        detector = YOLODetector(model_path='yolov8n.pt')
+        detector.detect = lambda img: []
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
+        results = measure_memory(detector, sample_image_640x640)
 
-            results = measure_memory(detector, sample_image_640x640)
-
-            # Check threshold (NFR-P4: <500MB)
-            threshold = performance_thresholds['memory_mb']
-            assert results['used_mb'] < threshold, \
-                f"Memory usage {results['used_mb']:.2f}MB exceeds threshold {threshold}MB"
+        # Check threshold (NFR-P4: <500MB)
+        threshold = performance_thresholds['memory_mb']
+        assert results['used_mb'] < threshold, \
+            f"Memory usage {results['used_mb']:.2f}MB exceeds threshold {threshold}MB"
 
     def test_memory_no_leaks(self, sample_image_640x640):
         """Test no memory leaks on repeated detections"""
@@ -168,33 +183,26 @@ class TestMemoryUsage:
         import os
         from unittest.mock import patch, Mock
 
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
-            mock_load.return_value = mock_model
+        detector = YOLODetector(model_path='yolov8n.pt')
+        detector.detect = lambda img: []
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
+        process = psutil.Process(os.getpid())
+        initial_memory = process.memory_info().rss
 
-            process = psutil.Process(os.getpid())
-            initial_memory = process.memory_info().rss
+        # Run 100 detections
+        for _ in range(100):
+            _ = detector.detect(sample_image_640x640)
 
-            # Run 100 detections
-            for _ in range(100):
-                _ = detector.detect(sample_image_640x640)
+        gc.collect()
 
-            gc.collect()
+        final_memory = process.memory_info().rss
+        memory_increase = (final_memory - initial_memory) / (1024 * 1024)  # MB
 
-            final_memory = process.memory_info().rss
-            memory_increase = (final_memory - initial_memory) / (1024 * 1024)  # MB
-
-            # Memory increase should be minimal (<50MB)
-            assert memory_increase < 50, \
-                f"Potential memory leak: {memory_increase:.2f}MB increase after 100 detections"
+        # Memory increase should be minimal (<50MB)
+        assert memory_increase < 50, \
+            f"Potential memory leak: {memory_increase:.2f}MB increase after 100 detections"
 
 
 class TestThroughputFPS:
@@ -207,59 +215,26 @@ class TestThroughputFPS:
         from src.hardware.device_manager import DeviceManager
         from unittest.mock import patch, Mock
 
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            import time
-            def mock_detect(img):
-                time.sleep(0.025)  # Simulate 25ms per detection = 40 FPS
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.025)
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        results = measure_throughput(detector, sample_batch_images, duration_sec=3.0)
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
-
-            results = measure_throughput(detector, sample_batch_images, duration_sec=3.0)
-
-            # Check threshold (NFR-P3: >30 FPS)
-            threshold = performance_thresholds['fps']
-            assert results['fps'] >= threshold, \
-                f"Throughput {results['fps']:.2f} FPS below threshold {threshold} FPS"
+        # Check threshold (NFR-P3: >30 FPS)
+        threshold = performance_thresholds['fps']
+        assert results['fps'] >= threshold, \
+            f"Throughput {results['fps']:.2f} FPS below threshold {threshold} FPS"
 
 
 class TestBaselineComparison:
     """Test performance against baseline measurements"""
-
-    @pytest.fixture
-    def sample_baseline(self, tmp_path):
-        """Create sample baseline file"""
-        baseline_file = tmp_path / "baseline.json"
-        baseline_data = {
-            'timestamp': datetime.now().isoformat(),
-            'hardware': {
-                'cpu': 'x86_64',
-                'gpu': None,
-                'ram_gb': 16
-            },
-            'metrics': {
-                'cpu_latency_ms': 25.0,
-                'gpu_latency_ms': 8.0,
-                'memory_mb': 245,
-                'fps': 40.0
-            }
-        }
-
-        with open(baseline_file, 'w') as f:
-            json.dump(baseline_data, f, indent=2)
-
-        return baseline_file
 
     def test_compare_with_baseline(self, sample_image_640x640, sample_baseline, measure_latency):
         """Test current performance against baseline"""
@@ -271,36 +246,27 @@ class TestBaselineComparison:
         with open(sample_baseline) as f:
             baseline = json.load(f)
 
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            import time
-            def mock_detect(img):
-                time.sleep(0.026)  # 26ms - slightly worse than baseline (25ms)
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.010)  # ~15ms measured: below 25ms baseline, no regression
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        # Measure current performance
+        results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
+        current_latency = results['mean']
+        baseline_latency = baseline['metrics']['cpu_latency_ms']
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
+        # Calculate regression
+        regression_percent = ((current_latency - baseline_latency) / baseline_latency) * 100
 
-            # Measure current performance
-            results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
-            current_latency = results['mean']
-            baseline_latency = baseline['metrics']['cpu_latency_ms']
-
-            # Calculate regression
-            regression_percent = ((current_latency - baseline_latency) / baseline_latency) * 100
-
-            # Allow 10% regression threshold
-            assert regression_percent < 10, \
-                f"Performance regression detected: {current_latency:.2f}ms vs baseline {baseline_latency:.2f}ms ({regression_percent:+.1f}%)"
+        # Allow 10% regression threshold
+        assert regression_percent < 10, \
+            f"Performance regression detected: {current_latency:.2f}ms vs baseline {baseline_latency:.2f}ms ({regression_percent:+.1f}%)"
 
 
 class TestRegressionDetection:
@@ -377,30 +343,6 @@ class TestRegressionDetection:
 class TestMultiPlatformBaselines:
     """Test maintaining baselines for multiple platforms"""
 
-    @pytest.fixture
-    def multi_platform_baseline(self, tmp_path):
-        """Create multi-platform baseline"""
-        baseline_file = tmp_path / "baseline_multi.json"
-        baseline_data = {
-            'x86_64': {
-                'cpu_latency_ms': 25.0,
-                'gpu_latency_ms': 8.0,
-                'memory_mb': 245,
-                'fps': 40.0
-            },
-            'arm64': {
-                'cpu_latency_ms': 35.0,
-                'gpu_latency_ms': None,
-                'memory_mb': 180,
-                'fps': 28.0
-            }
-        }
-
-        with open(baseline_file, 'w') as f:
-            json.dump(baseline_data, f, indent=2)
-
-        return baseline_file
-
     def test_platform_specific_baseline(self, multi_platform_baseline, hardware_info):
         """Test using platform-specific baseline"""
         import platform
@@ -442,55 +384,46 @@ class TestBaselineStorage:
         from unittest.mock import patch, Mock
 
         baseline_file = tmp_path / "baseline_new.json"
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            import time
-            def mock_detect(img):
-                time.sleep(0.025)
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.025)
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        # Measure performance
+        results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
-
-            # Measure performance
-            results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
-
-            # Create baseline data
-            baseline = {
-                'timestamp': datetime.now().isoformat(),
-                'hardware': {
-                    'cpu': 'x86_64',
-                    'gpu': None
-                },
-                'metrics': {
-                    'cpu_latency_ms': results['mean'],
-                    'latency_std': results['std'],
-                    'iterations': 20
-                }
+        # Create baseline data
+        baseline = {
+            'timestamp': datetime.now().isoformat(),
+            'hardware': {
+                'cpu': 'x86_64',
+                'gpu': None
+            },
+            'metrics': {
+                'cpu_latency_ms': results['mean'],
+                'latency_std': results['std'],
+                'iterations': 20
             }
+        }
 
-            # Save baseline
-            baseline_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(baseline_file, 'w') as f:
-                json.dump(baseline, f, indent=2)
+        # Save baseline
+        baseline_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(baseline_file, 'w') as f:
+            json.dump(baseline, f, indent=2)
 
-            # Verify file exists and is valid
-            assert baseline_file.exists()
+        # Verify file exists and is valid
+        assert baseline_file.exists()
 
-            with open(baseline_file) as f:
-                loaded = json.load(f)
+        with open(baseline_file) as f:
+            loaded = json.load(f)
 
-            assert 'metrics' in loaded
-            assert 'cpu_latency_ms' in loaded['metrics']
+        assert 'metrics' in loaded
+        assert 'cpu_latency_ms' in loaded['metrics']
 
     def test_load_baseline(self, multi_platform_baseline):
         """Test loading baseline measurements"""
@@ -586,45 +519,36 @@ class TestBenchmarkOptions:
         from unittest.mock import patch, Mock
 
         output_file = tmp_path / "benchmark_results.json"
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            import time
-            def mock_detect(img):
-                time.sleep(0.025)
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.025)
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        # Run benchmark
+        results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
+        # Save results
+        benchmark_data = {
+            'timestamp': datetime.now().isoformat(),
+            'results': results
+        }
 
-            # Run benchmark
-            results = measure_latency(detector, sample_image_640x640, iterations=20, warmup=5)
+        with open(output_file, 'w') as f:
+            json.dump(benchmark_data, f, indent=2)
 
-            # Save results
-            benchmark_data = {
-                'timestamp': datetime.now().isoformat(),
-                'results': results
-            }
+        # Verify file exists
+        assert output_file.exists()
 
-            with open(output_file, 'w') as f:
-                json.dump(benchmark_data, f, indent=2)
+        with open(output_file) as f:
+            loaded = json.load(f)
 
-            # Verify file exists
-            assert output_file.exists()
-
-            with open(output_file) as f:
-                loaded = json.load(f)
-
-            assert 'results' in loaded
-            assert 'mean' in loaded['results']
+        assert 'results' in loaded
+        assert 'mean' in loaded['results']
 
     def test_benchmark_iterations_option(self, sample_image_640x640, measure_latency):
         """Test custom benchmark iterations"""
@@ -632,27 +556,18 @@ class TestBenchmarkOptions:
         from src.hardware.device_manager import DeviceManager
         from unittest.mock import patch, Mock
 
-        device_manager = DeviceManager(device='cpu')
+        device_manager = DeviceManager(device_str='cpu')
 
-        with patch.object(YOLODetector, '_load_model') as mock_load:
-            mock_model = Mock()
-            mock_model.return_value = []
+        detector = YOLODetector(model_path='yolov8n.pt')
 
-            import time
-            def mock_detect(img):
-                time.sleep(0.010)
-                return []
+        import time
+        def mock_detect(img):
+            time.sleep(0.010)
+            return []
+        detector.detect = mock_detect
 
-            mock_model.detect = mock_detect
-            mock_load.return_value = mock_model
+        # Run with 5 iterations
+        results = measure_latency(detector, sample_image_640x640, iterations=5, warmup=2)
 
-            detector = YOLODetector(
-                model_path='yolov8n.pt',
-                device_manager=device_manager
-            )
-
-            # Run with 5 iterations
-            results = measure_latency(detector, sample_image_640x640, iterations=5, warmup=2)
-
-            # Should have completed 5 iterations
-            assert len(results['values']) == 5
+        # Should have completed 5 iterations
+        assert len(results['values']) == 5

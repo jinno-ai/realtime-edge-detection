@@ -176,6 +176,16 @@ class ConfigValidator:
                 hint="Set device.quantization to null, 'int8', or 'fp16'"
             ),
 
+            # Input parameters
+            ValidationRule(
+                parameter_path="input.image_size",
+                validator=lambda x: isinstance(x, list) and len(x) == 2 and all(
+                    isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in x
+                ),
+                error_message="Image size must be a list of two positive integers [width, height]",
+                hint="Set input.image_size to [width, height], e.g. [640, 640]"
+            ),
+
             # Logging parameters
             # Issue #2: Logging level validator now case-insensitive (normalizes to uppercase)
             ValidationRule(

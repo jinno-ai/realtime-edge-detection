@@ -106,7 +106,7 @@ class VideoCapture:
     
     def get_fps(self) -> float:
         """Get actual FPS"""
-        if self.start_time and self.frame_count > 0:
+        if self.start_time is not None and self.frame_count > 0:
             elapsed = time.time() - self.start_time
             return self.frame_count / elapsed
         return 0.0

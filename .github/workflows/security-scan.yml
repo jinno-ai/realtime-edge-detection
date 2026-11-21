@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -42,7 +42,7 @@ jobs:
           safety check
 
       - name: Upload reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: security-reports
           path: |
@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -99,7 +99,7 @@ jobs:
           bandit -r src/ -f txt
 
       - name: Upload Bandit report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bandit-report
           path: bandit-report.json
@@ -112,7 +112,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Run Semgrep
         continue-on-error: true
@@ -120,7 +120,7 @@ jobs:
           semgrep --config=auto --json --output=semgrep-report.json src/
 
       - name: Upload Semgrep report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: semgrep-report
           path: semgrep-report.json
@@ -133,7 +133,7 @@ jobs:
 
     steps:
       - name: Download all reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Generate summary
         run: |

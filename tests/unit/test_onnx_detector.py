@@ -8,6 +8,33 @@ from src.models.onnx import ONNXDetector
 from src.models.base import AbstractDetector
 
 
+
+
+def _make_test_onnx(path, with_detection=False):
+    """Create a minimal valid ONNX model with YOLO-like I/O shapes."""
+    import onnx
+    from onnx import helper, TensorProto
+
+    out = np.zeros((1, 84, 8400), dtype=np.float32)
+    if with_detection:
+        out[0, 0, 0] = 320.0  # x center
+        out[0, 1, 0] = 320.0  # y center
+        out[0, 2, 0] = 100.0  # width
+        out[0, 3, 0] = 100.0  # height
+        out[0, 4, 0] = 0.9    # objectness
+        out[0, 5, 0] = 0.9    # class-0 probability
+
+    const = helper.make_node(
+        'Constant', inputs=[], outputs=['output0'],
+        value=helper.make_tensor('v', TensorProto.FLOAT, out.shape, out))
+    graph = helper.make_graph(
+        [const], 'test',
+        [helper.make_tensor_value_info('images', TensorProto.FLOAT, [1, 3, 640, 640])],
+        [helper.make_tensor_value_info('output0', TensorProto.FLOAT, [1, 84, 8400])])
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 13)])
+    model.ir_version = 10
+    onnx.save(model, str(path))
+
 class TestONNXDetector:
     """Test suite for ONNXDetector class."""
 
@@ -34,7 +61,7 @@ class TestONNXDetector:
         """Test loading ONNX model."""
         # Create a dummy ONNX file
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         config = {
             'model_path': str(onnx_file),
@@ -44,12 +71,12 @@ class TestONNXDetector:
 
         # This should load the model
         detector.load_model()
-        assert detector.model is not None
+        assert detector.session is not None
 
     def test_detect_single_image(self, tmp_path):
         """Test detection on single image."""
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         config = {
             'model_path': str(onnx_file),
@@ -70,7 +97,7 @@ class TestONNXDetector:
     def test_detect_batch_images(self, tmp_path):
         """Test batch detection."""
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         config = {
             'model_path': str(onnx_file),
@@ -95,7 +122,7 @@ class TestONNXDetector:
     def test_get_model_info(self, tmp_path):
         """Test getting model information."""
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         config = {
             'model_path': str(onnx_file),
@@ -114,7 +141,7 @@ class TestONNXDetector:
     def test_output_format_matches_pytorch(self, tmp_path):
         """Test that ONNX output format matches PyTorch detector format."""
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         config = {
             'model_path': str(onnx_file),
@@ -137,7 +164,7 @@ class TestONNXDetector:
     def test_onnx_runtime_provider_selection(self, tmp_path):
         """Test ONNX Runtime provider selection."""
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         # Test CPU provider
         config = {
@@ -152,7 +179,7 @@ class TestONNXDetector:
     def test_preprocess(self, tmp_path):
         """Test image preprocessing."""
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         config = {
             'model_path': str(onnx_file),
@@ -168,7 +195,7 @@ class TestONNXDetector:
     def test_postprocess(self, tmp_path):
         """Test output postprocessing."""
         onnx_file = tmp_path / "test.onnx"
-        onnx_file.write_bytes(b"dummy onnx model")
+        _make_test_onnx(onnx_file)
 
         config = {
             'model_path': str(onnx_file),

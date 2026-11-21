@@ -4,6 +4,7 @@ Profile management for configuration.
 Handles loading and merging profile-based configurations.
 """
 
+import copy
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -102,7 +103,7 @@ class ProfileManager:
         Returns:
             Merged dictionary (new instance, original dicts not modified).
         """
-        result = base.copy()
+        result = copy.deepcopy(base)
 
         for key, value in override.items():
             if (

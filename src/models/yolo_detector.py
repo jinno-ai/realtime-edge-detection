@@ -20,6 +20,11 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from src.core.config import ConfigManager
 
+try:
+    from ultralytics import YOLO
+except ImportError:
+    YOLO = None
+
 
 class YOLODetector:
     """YOLO v8 object detector for edge devices"""
@@ -91,7 +96,8 @@ class YOLODetector:
     def load_model(self) -> None:
         """Load YOLO model"""
         try:
-            from ultralytics import YOLO
+            if YOLO is None:
+                raise ImportError("ultralytics not installed")
             self.model = YOLO(self.model_path)
             print(f"✅ Model loaded: {self.model_path}")
         except ImportError:

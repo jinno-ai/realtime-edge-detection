@@ -55,10 +55,8 @@ class TestConfigManagerYAMLLoading:
             f.write("model:\n  type: yolo_v8\n    path: yolov8n.pt  # Bad indentation")
 
         if ConfigManager:
-            manager = ConfigManager(str(config_file))
-
             with pytest.raises(Exception) as exc_info:
-                manager.load_config()
+                ConfigManager(str(config_file))
 
             # Check error message includes line number or location
             error_msg = str(exc_info.value)
@@ -102,12 +100,10 @@ model: !!python/object/apply:os.system
             f.write(malicious_yaml)
 
         if ConfigManager:
-            manager = ConfigManager(str(config_file))
-
             # Should not execute code - should raise error or return string
             # If it tries to execute, test will fail
             with pytest.raises(Exception):
-                config = manager.load_config()
+                ConfigManager(str(config_file))
         else:
             pytest.fail("ConfigManager not implemented")
 
@@ -287,11 +283,8 @@ class TestConfigValidation:
             yaml.dump(config_content, f)
 
         if ConfigManager:
-            manager = ConfigManager(str(config_file))
-
-            # load_config should raise exception for invalid config
             with pytest.raises(Exception) as exc_info:
-                manager.load_config()
+                ConfigManager(str(config_file))
 
             error_msg = str(exc_info.value)
             assert 'confidence_threshold' in error_msg
@@ -308,11 +301,8 @@ class TestConfigValidation:
             yaml.dump(config_content, f)
 
         if ConfigManager:
-            manager = ConfigManager(str(config_file))
-
-            # load_config should raise exception for invalid config
             with pytest.raises(Exception) as exc_info:
-                manager.load_config()
+                ConfigManager(str(config_file))
 
             error_msg = str(exc_info.value)
             assert 'iou_threshold' in error_msg
@@ -349,10 +339,8 @@ class TestConfigValidation:
             yaml.dump(config_content, f)
 
         if ConfigManager:
-            manager = ConfigManager(str(config_file))
-
             with pytest.raises(Exception) as exc_info:
-                manager.load_config()
+                ConfigManager(str(config_file))
 
             # Check for hint in error
             error = exc_info.value
@@ -485,14 +473,11 @@ class TestProfileLoading:
             yaml.dump(default_content, f)
 
         if ConfigManager:
-            manager = ConfigManager(
-                default_config=str(default_config),
-                profile='nonexistent'
-            )
-            manager.config_dir = tmp_path
-
             with pytest.raises(Exception) as exc_info:
-                manager.load_config()
+                ConfigManager(
+                    default_config=str(default_config),
+                    profile='nonexistent'
+                )
 
             error_msg = str(exc_info.value)
             assert 'nonexistent' in error_msg
@@ -582,10 +567,8 @@ class TestConfigValidationIntegration:
             yaml.dump(config_content, f)
 
         if ConfigManager:
-            manager = ConfigManager(str(config_file))
-
             with pytest.raises(Exception) as exc_info:
-                manager.load_config()
+                ConfigManager(str(config_file))
 
             error_msg = str(exc_info.value)
             assert 'confidence_threshold' in error_msg
@@ -623,10 +606,8 @@ class TestConfigValidationIntegration:
             yaml.dump(config_content, f)
 
         if ConfigManager:
-            manager = ConfigManager(str(config_file))
-
             with pytest.raises(Exception) as exc_info:
-                manager.load_config()
+                ConfigManager(str(config_file))
 
             # Check for hint in error
             error = exc_info.value
@@ -685,14 +666,11 @@ class TestProfileValidation:
             yaml.dump(profile_content, f)
 
         if ConfigManager:
-            manager = ConfigManager(
-                default_config=str(default_config),
-                profile='badprofile'
-            )
-            manager.config_dir = tmp_path
-
             with pytest.raises(Exception):
-                manager.load_config()
+                ConfigManager(
+                    default_config=str(default_config),
+                    profile='badprofile'
+                )
         else:
             pytest.fail("ConfigManager not implemented")
 

@@ -1,74 +1,47 @@
-# Real-time Edge Detection
+# realtime-edge-detection
 
-Low-latency object detection optimized for edge devices. Uses YOLO v8 for fast, accurate detection on resource-constrained hardware.
+Real-time object detection toolkit for edge devices — YOLOv8/v10 +
+ONNX in Python. CLI, async API, config profiles, device detection,
+benchmarks, and a real test suite.
 
-## Features
+> **Status**: active development has moved to
+> [realtime-edge-detection-rs](https://github.com/jinno-ai/realtime-edge-detection-rs),
+> a Rust port focused on the edge runtime path (inference → decode → NMS).
+> This repo remains the original Python implementation — larger feature
+> surface, heavier stack (torch + ultralytics).
 
-- ⚡ **Real-time Detection**: 30+ FPS on edge devices
-- 🎯 **High Accuracy**: YOLO v8 state-of-the-art model
-- 🔧 **Optimization**: Edge-specific optimizations (quantization, resolution reduction)
-- 📹 **Video Processing**: Batch video processing support
-- 🖼️ **Image Preprocessing**: Augmentation and letterbox support
-- 🎮 **Easy CLI**: Simple command-line interface
+## Structure
 
-## Quick Start
+```
+src/
+  detection/   YOLOv8 & YOLOv10 detectors, factory, ONNX support
+  models/      model management, versioning, quantization
+  device/      hardware detection & selection (CPU/GPU)
+  preprocessing/ letterbox, augmentation
+  cli/         detect / batch / interactive / metrics commands
+  api/         async detection API
+  metrics/     performance metrics collection
+  config/      YAML profiles with validation
+tests/         unit + integration + performance + security suites
+examples/      basic / batch / video-streaming / async usage
+```
 
-### Installation
+## Quick start
 
-```bash
+```sh
 pip install -r requirements.txt
-```
 
-### CLI Usage
-
-```bash
-# Detect objects in image
-python run.py detect image.jpg --show
-
-# Real-time webcam detection
-python run.py webcam
-
-# Process video file
-python run.py video input.mp4 --output output.mp4
-
-# Benchmark performance
+python run.py detect image.jpg          # single image
+python run.py video input.mp4           # video processing
 python run.py benchmark --iterations 100
-
-# Test preprocessing
-python run.py preprocess image.jpg
+pytest tests/                           # test suite
 ```
 
-### Python API
+## Honest notes
 
-```python
-from src.models.yolo_detector import YOLODetector
-
-# Initialize
-detector = YOLODetector("yolov8n.pt", conf_threshold=0.5)
-detector.load_model()
-
-# Detect
-image = cv2.imread("image.jpg")
-detections = detector.detect(image)
-
-for det in detections:
-    print(f"{det['class_name']}: {det['confidence']:.3f}")
-```
-
-## Performance
-
-- **Latency**: < 30ms per inference (640x640)
-- **Throughput**: 30+ FPS on CPU
-- **Model Size**: 6MB (YOLOv8n)
-- **Accuracy**: mAP 37.3 on COCO
-
-## Hardware Support
-
-- ✅ CPU (x86, ARM)
-- ✅ GPU (CUDA, MPS)
-- ✅ Edge TPU
-- ✅ Neural Engine
-
-## License
-
-MIT
+- Built for edge-oriented workflows; absolute performance numbers depend
+  on hardware and model choice — no unverified FPS claims here.
+- Model weights are not committed; bring your own YOLO checkpoint or
+  export via `yolo export`.
+- Historical docs live in `docs/`; some predate the current code, so
+  trust the code and tests first.
