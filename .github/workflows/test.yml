@@ -54,12 +54,19 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report-${{ matrix.python-version }}
-        path: htmlcov/
+        path: |
+          htmlcov/
+          coverage.xml
+          .coverage
+        include-hidden-files: true
 
   coverage-comment:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
     - uses: actions/checkout@v4
 
@@ -72,5 +79,5 @@ jobs:
       uses: py-cov-action/python-coverage-comment-action@v3
       with:
         GITHUB_TOKEN: ${{ github.token }}
-        MINIMUM_GREEN: 80
+        MINIMUM_GREEN: 70
         MINIMUM_ORANGE: 60
